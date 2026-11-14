@@ -117,6 +117,8 @@ func _on_msg(msg: String, a: Array) -> void:
 				avatars.erase(a[0])
 			info.erase(a[0])
 		"match_end":
+			time_left = 0.0
+			scores = a[0]
 			player.die()
 			hud.show_results(a[0], a[1], a[2], a[3])
 

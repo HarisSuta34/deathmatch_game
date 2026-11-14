@@ -32,10 +32,11 @@ func _ready() -> void:
 	Net.disconnected.connect(_end_game)
 	menu = Menu.new()
 	add_child(menu)
+	Net.dev_seconds = float(opt.get("match-seconds", 0))
 	if opt.has("practice"):
 		Net.start_practice("Tester", int(opt.practice))
 	if opt.has("shot"):
-		_screenshot(opt.shot)
+		_screenshot(opt.shot, float(opt.get("shot-delay", 2)))
 
 
 func _start_server(opt: Dictionary) -> void:
@@ -75,9 +76,9 @@ func _end_game() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
-# Dev helper: `++ --shot=file.png` saves a screenshot after a few seconds and quits.
-func _screenshot(path: String) -> void:
-	await get_tree().create_timer(7.0).timeout
+# Dev helper: `++ --shot=file.png [--shot-delay=2]` saves a screenshot and quits.
+func _screenshot(path: String, delay: float) -> void:
+	await get_tree().create_timer(delay).timeout
 	get_viewport().get_texture().get_image().save_png(path)
 	get_tree().quit()
 

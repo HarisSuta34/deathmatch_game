@@ -81,6 +81,7 @@ func start_practice(nick: String, map_id: int) -> void:
 	local_room = Room.new()
 	local_room.practice = true
 	local_room.map_id = map_id
+	local_room.dev_seconds = dev_seconds
 	# Deferred, so messages arrive after the caller finished, like on a network.
 	local_room.send = func(_id: int, msg: String, args: Array) -> void:
 		message.emit.call_deferred(msg, args)
