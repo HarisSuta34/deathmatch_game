@@ -62,6 +62,12 @@ func _on_msg(msg: String, a: Array) -> void:
 			game = Game.new()
 			add_child(game)
 			game.setup(a)
+			game.leave.connect(func() -> void:
+				Net.send("leave")
+				if Net.local_room:
+					Net.close()
+				_end_game()
+				menu._show_main(""))
 		"lobby":
 			if a[0].state == "lobby":
 				_end_game()

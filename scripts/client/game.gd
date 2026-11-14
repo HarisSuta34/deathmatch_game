@@ -7,6 +7,8 @@ const Player = preload("res://scripts/client/player.gd")
 const Avatar = preload("res://scripts/client/avatar.gd")
 const Hud = preload("res://scripts/client/hud.gd")
 
+signal leave   # the player pressed "Leave Match"
+
 const TICK_RATE := 20.0
 const INTERP_TICKS := 2.0   # render other players 100 ms in the past
 

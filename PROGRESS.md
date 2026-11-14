@@ -6,7 +6,7 @@
 - [x] 3. WebSocket server and client, lobby with room codes, players see each other move and shoot, server-authoritative damage
 - [x] 4. Random team split, even-player start rule, bases, loadout screen on respawn, match timer, scoring, end-of-match screen
 - [x] 5. The 3 maps and map selection
-- [ ] 6. Main menu, HUD and general polish
+- [x] 6. Main menu, HUD and general polish
 - [ ] 7. Web export, server export, docs/DEPLOY.md with free hosting instructions
 
 ## Notes for the next session

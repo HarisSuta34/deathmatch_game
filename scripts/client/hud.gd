@@ -25,6 +25,7 @@ var loadout_timer: Label
 var loadout_buttons := {}
 var results: PanelContainer
 var results_timer: Label
+var leave_btn: Button
 var _msg_t := 0.0
 var _hit_t := 0.0
 var _hit_kill := false
@@ -81,6 +82,12 @@ func _ready() -> void:
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_place(msg_label, Control.PRESET_CENTER, -300, 70, 600, 36)
 
+	leave_btn = Button.new()
+	leave_btn.text = "Leave Match"
+	leave_btn.focus_mode = Control.FOCUS_NONE
+	leave_btn.pressed.connect(func() -> void: game.leave.emit())
+	_place(leave_btn, Control.PRESET_TOP_LEFT, 16, 14, 130, 36)
+
 	board = _panel()
 	results = _panel()
 	_build_loadout()
@@ -99,9 +106,13 @@ func _process(delta: float) -> void:
 	score_labels[0].text = "RED  %d" % game.scores[0]
 	score_labels[1].text = "%d  BLUE" % game.scores[1]
 
+	for c: Control in [hp_label, hp_fill, ammo_label, weapon_label]:
+		c.visible = p.active
+	leave_btn.visible = Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
+
 	_msg_t -= delta
 	if p.active and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
-		msg_label.text = "Click to resume"
+		msg_label.text = "Click to play"
 	elif p.active and game.protected:
 		msg_label.text = "SPAWN PROTECTION"
 	elif _msg_t <= 0.0:

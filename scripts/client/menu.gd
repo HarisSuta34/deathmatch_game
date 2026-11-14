@@ -75,6 +75,7 @@ func _build_main(holder: Control) -> void:
 	pb.size_flags_horizontal = SIZE_EXPAND_FILL
 	prac.add_child(pb)
 	main_page.add_child(prac)
+	main_page.add_child(_label("WASD move  |  Mouse look  |  Left click shoot  |  Right click aim\nR reload  |  Space jump  |  Shift sprint  |  Tab scoreboard  |  Esc free mouse", 14, Color(0.6, 0.65, 0.72)))
 	status = _label("", 18, Color(1, 0.75, 0.4))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	main_page.add_child(status)
