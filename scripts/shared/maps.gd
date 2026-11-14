@@ -4,8 +4,14 @@ extends RefCounted
 # box list for its own ray tests, so it never needs a physics world per room.
 # Team 0 (red) has its base at -Z, team 1 (blue) at +Z.
 
-const NAMES := ["Open Field"]
-const COUNT := 1
+const NAMES := ["Open Field", "City Streets", "Sky Platforms"]
+const COUNT := 3
+
+const BRICK := Color(0.62, 0.3, 0.25)
+const CONCRETE := Color(0.72, 0.72, 0.74)
+const TAN := Color(0.78, 0.68, 0.5)
+const ASPHALT := Color(0.3, 0.3, 0.33)
+const SAND := Color(0.82, 0.74, 0.52)
 
 const RED := Color(0.85, 0.2, 0.2)
 const BLUE := Color(0.2, 0.4, 0.95)
@@ -24,6 +30,10 @@ static func get_map(id: int) -> Dictionary:
 		var l := []
 		var hz := 40.0
 		match id:
+			1:
+				_city(l)
+			2:
+				_platforms(l)
 			_:
 				_field(l)
 		for b: Dictionary in l:
@@ -172,3 +182,55 @@ static func _field(l: Array) -> void:
 	_tree(l, -26, 2)
 	_tree(l, 22, 26)
 	_tree(l, -14, 17)
+
+
+# Narrow streets between a 4x4 grid of tall buildings: long sightlines, tight corners.
+static func _city(l: Array) -> void:
+	_arena(l, 30, 40, ASPHALT, BRICK.darkened(0.35))
+	var cols := [BRICK, CONCRETE, TAN, STONE]
+	var i := 0
+	for z: float in [6.5, 19.5]:
+		for x: float in [-22.5, -7.5, 7.5, 22.5]:
+			var c: Color = cols[i % 4]
+			_sym(l, x, 0, z, 11, 5.0 + (i * 3) % 5, 9, c)
+			i += 1
+	_sym(l, 0, 0, 0, 2, 1.5, 2, STONE)
+	_sym(l, 1.2, 0, 13, 1.5, 1.5, 1.5, WOOD)
+	_sym(l, -15.8, 0, 13, 1.5, 1.5, 1.5, WOOD)
+	_sym(l, 14.2, 0, 0.8, 1.5, 1.5, 1.5, WOOD)
+	_sym(l, 15.8, 0, 13, 1.5, 3, 1.5, WOOD)
+	_sym(l, -8, 0, 26, 3, 1.2, 1, CONCRETE)
+	_sym(l, 9, 0, 26.5, 1.5, 1.5, 1.5, WOOD)
+	_sym(l, 29, 0, 6.5, 1.5, 1.5, 1.5, WOOD)
+	_sym(l, -0.9, 0, 6, 1.5, 1.5, 1.5, WOOD)
+
+
+# Multi-level: raised central and side platforms joined by bridges, reached by ramps.
+static func _platforms(l: Array) -> void:
+	_arena(l, 30, 40, SAND, STONE.darkened(0.25))
+	# Central platform (top at y=4) on four pillars, open underneath.
+	_box(l, 0, 3.5, 0, 14, 0.5, 14, CONCRETE)
+	_sym(l, 6, 0, 6, 1.5, 3.5, 1.5, STONE)
+	_sym(l, -6, 0, 6, 1.5, 3.5, 1.5, STONE)
+	_box(l, 0, 4, 0, 4, 2, 4, STONE)
+	_sym_ramp(l, Vector3(0, 0, 17), Vector3(0, 4, 7), 4, TAN)
+	# Side platforms with a ramp at each end and a railing on the outside.
+	_sym(l, 19, 3.5, 0, 10, 0.5, 18, CONCRETE)
+	_sym(l, 15, 0, 8, 1.5, 3.5, 1.5, STONE)
+	_sym(l, 23, 0, 8, 1.5, 3.5, 1.5, STONE)
+	_sym(l, 15, 0, -8, 1.5, 3.5, 1.5, STONE)
+	_sym(l, 23, 0, -8, 1.5, 3.5, 1.5, STONE)
+	_sym(l, 23.75, 4, 0, 0.5, 1, 10, STONE)
+	_sym_ramp(l, Vector3(19, 0, 21), Vector3(19, 4, 9), 4, TAN)
+	_sym_ramp(l, Vector3(19, 0, -21), Vector3(19, 4, -9), 4, TAN)
+	# Bridges between centre and sides.
+	_sym(l, 10.5, 3.6, 0, 7, 0.4, 3, WOOD)
+	# Cover on the platforms and on the ground.
+	_sym(l, 17, 4, 4, 2, 1.2, 2, WOOD)
+	_sym(l, 5, 4, -5.5, 3, 1.2, 1, STONE)
+	_sym(l, 9, 0, 13, 2, 2, 2, WOOD)
+	_sym(l, -10, 0, 22, 2, 2, 2, WOOD)
+	_sym(l, -9, 0, 12, 1, 2.5, 5, STONE)
+	_sym(l, 26, 0, 24, 2, 2, 2, WOOD)
+	_sym(l, 5, 0, 25, 5, 1.2, 1, STONE)
+	_sym(l, 11, 0, 3, 2, 2, 2, WOOD)

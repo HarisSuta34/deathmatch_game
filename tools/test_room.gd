@@ -69,6 +69,17 @@ func _init() -> void:
 	for i in 220:
 		r.tick(0.05)
 	_expect("back to lobby", r.state == "lobby")
+	# Every spawn slot on every map must be free standing room on the base floor.
+	var Maps: GDScript = load("res://scripts/shared/maps.gd")
+	for m: int in Maps.COUNT:
+		var map: Dictionary = Maps.get_map(m)
+		var ok := true
+		for team in 2:
+			for n in 10:
+				var p: Vector3 = Maps.spawn_point(map, team, n)[0]
+				var f: float = Maps.ray_world(map, p + Vector3(0, 9, 0), p - Vector3(0, 1, 0))
+				ok = ok and absf((9.0 - 10.0 * f) + 0.1) < 0.2
+		_expect("map %d spawns clear" % m, ok)
 	quit()
 
 
