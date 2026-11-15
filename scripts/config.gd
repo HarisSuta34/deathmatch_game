@@ -5,7 +5,7 @@ const DEFAULT_PORT := 9080
 const LOCAL_URL := "ws://localhost:9080"
 # Set this to your deployed server (must be wss:// when the site is served over https),
 # e.g. "wss://my-game-server.example.com". See docs/DEPLOY.md.
-const PRODUCTION_URL := ""
+const PRODUCTION_URL := "wss://deathmatch-game-xxxx.onrender.com"
 
 
 static func server_url() -> String:
