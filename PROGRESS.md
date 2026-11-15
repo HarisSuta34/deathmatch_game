@@ -7,9 +7,19 @@
 - [x] 4. Random team split, even-player start rule, bases, loadout screen on respawn, match timer, scoring, end-of-match screen
 - [x] 5. The 3 maps and map selection
 - [x] 6. Main menu, HUD and general polish
-- [ ] 7. Web export, server export, docs/DEPLOY.md with free hosting instructions
+- [x] 7. Web export, server export, docs/DEPLOY.md with free hosting instructions
+
+## Waiting on the owner (account steps)
+- [ ] Choose a server host (docs/DEPLOY.md, option A Render recommended) and deploy it
+- [ ] Put the resulting `wss://` address into `PRODUCTION_URL` in `scripts/config.gd`, run `tools\publish_web.ps1`
+- [ ] Enable GitHub Pages for the `gh-pages` branch (repo Settings → Pages)
+
+## Not yet verified
+- The web build has not been opened in a real browser by Claude (export succeeds; desktop build, Linux Docker server and the network protocol are tested). First thing to check: `tools\serve_web.ps1`.
+- Gameplay feel (movement speed, weapon balance, map layouts) has only been checked through screenshots and automated tests, not by a human playing.
 
 ## Notes for the next session
+- M7: `export_presets.cfg` has presets "Web" (no threads) and "Server" (Linux dedicated server). `tools\export.ps1` builds both into `build\` (git-ignored). `tools\publish_web.ps1` force-pushes the web build to the `gh-pages` branch. `Dockerfile` runs the server from source with the official Godot Linux binary (verified locally with Docker + `tools\test_net.ps1 -port 9393 -External`). Hosting research (Nov 2026) is summarised in docs/DEPLOY.md.
 - M4: match flow lives in `room.gd` (`_try_start`, `_spawn`, `_end_match`): 5 s warmup with loadout screen, 3 s respawn, 2.5 s spawn protection (ends when you shoot), 10 s results, then lobby. Covered by `tools/test_room.gd`. Screens can be checked with `++ --practice=0 --match-seconds=1 --shot=x.png --shot-delay=8`.
 - M3: `main.gd` runs as server with `++ --server` (flags: `--port=`, `--dev`, `--match-seconds=`), otherwise shows `scripts/client/menu.gd` (menu + lobby). `Net` autoload (`scripts/net.gd`) holds rooms on the server and the connection on clients.
 - Network regression test: `tools\test_net.ps1` (server + 4 headless bots from `scripts/dev/bot.gd`; expect kill events and "BOT back in lobby"). The `ready_state != STATE_OPEN` errors at the very end are just bots quitting.

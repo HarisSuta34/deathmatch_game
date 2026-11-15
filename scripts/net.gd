@@ -20,6 +20,7 @@ var dev_seconds := 0.0
 var rooms := {}          # code -> Room            (server)
 var peer_room := {}      # peer id -> Room         (server)
 var local_room: Room     # offline practice room   (client)
+var _ping_t := 0.0
 
 
 func _ready() -> void:
@@ -43,6 +44,12 @@ func _physics_process(delta: float) -> void:
 			rooms[code].tick(delta)
 	elif local_room:
 		local_room.tick(delta)
+	elif is_online():
+		# Keep-alive so proxies don't drop an idle lobby connection and free hosts stay awake.
+		_ping_t += delta
+		if _ping_t > 20.0:
+			_ping_t = 0.0
+			_c2s.rpc_id(1, "ping", [])
 
 
 # ---------- client ----------
