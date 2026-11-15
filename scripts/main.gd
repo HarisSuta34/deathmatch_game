@@ -3,10 +3,12 @@ extends Node
 
 const Game = preload("res://scripts/client/game.gd")
 const Menu = preload("res://scripts/client/menu.gd")
+const Backdrop = preload("res://scripts/client/backdrop.gd")
 const Config = preload("res://scripts/config.gd")
 
 var game: Node3D
 var menu: Control
+var backdrop: Node3D
 
 
 # Command line (after `++`):  --server [--port=9080] [--dev] [--match-seconds=N]
@@ -30,11 +32,15 @@ func _ready() -> void:
 	_setup_input()
 	Net.message.connect(_on_msg)
 	Net.disconnected.connect(_end_game)
+	Sfx.init()
 	menu = Menu.new()
 	add_child(menu)
+	_end_game()
 	Net.dev_seconds = float(opt.get("match-seconds", 0))
 	if opt.has("practice"):
 		Net.start_practice("Tester", int(opt.practice))
+		if opt.has("weapon"):
+			Net.send("pick", [opt.weapon])
 	if opt.has("shot"):
 		_screenshot(opt.shot, float(opt.get("shot-delay", 2)))
 
@@ -58,6 +64,9 @@ func _on_msg(msg: String, a: Array) -> void:
 	match msg:
 		"match_start":
 			_end_game()
+			backdrop.queue_free()
+			backdrop = null
+			Sfx.music(false)
 			menu.visible = false
 			game = Game.new()
 			add_child(game)
@@ -79,6 +88,10 @@ func _end_game() -> void:
 		game.queue_free()
 		game = null
 	menu.visible = true
+	if backdrop == null:
+		backdrop = Backdrop.new()
+		add_child(backdrop)
+	Sfx.music(true)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
@@ -91,14 +104,15 @@ func _screenshot(path: String, delay: float) -> void:
 
 func _setup_input() -> void:
 	var keys := {
-		"forward": KEY_W, "back": KEY_S, "left": KEY_A, "right": KEY_D,
-		"jump": KEY_SPACE, "sprint": KEY_SHIFT, "reload": KEY_R, "scores": KEY_TAB,
+		"forward": [KEY_W, KEY_UP], "back": [KEY_S, KEY_DOWN], "left": [KEY_A, KEY_LEFT], "right": [KEY_D, KEY_RIGHT],
+		"jump": [KEY_SPACE], "sprint": [KEY_SHIFT], "reload": [KEY_R], "scores": [KEY_TAB],
 	}
 	for a: String in keys:
 		InputMap.add_action(a)
-		var e := InputEventKey.new()
-		e.physical_keycode = keys[a]
-		InputMap.action_add_event(a, e)
+		for key: Key in keys[a]:
+			var e := InputEventKey.new()
+			e.physical_keycode = key
+			InputMap.action_add_event(a, e)
 	var buttons := {"shoot": MOUSE_BUTTON_LEFT, "aim": MOUSE_BUTTON_RIGHT}
 	for a: String in buttons:
 		InputMap.add_action(a)

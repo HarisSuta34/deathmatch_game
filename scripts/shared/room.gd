@@ -9,9 +9,9 @@ const Maps = preload("res://scripts/shared/maps.gd")
 const TICK := 0.05            # snapshot interval (20 Hz)
 const MAX_HP := 100
 const MAX_PLAYERS := 20
-const RESPAWN_DELAY := 3.0
-const SPAWN_PROTECT := 2.5
-const WARMUP := 5.0           # loadout time before the first spawn
+const RESPAWN_DELAY := 6.0       # the loadout screen is shown during this time
+const SPAWN_PROTECT := 10.0      # invincible after spawning; ends early when you attack
+const WARMUP := 6.0           # loadout time before the first spawn
 const RESULTS_TIME := 10.0
 const EYE := Vector3(0, 1.5, 0)
 const BOX_HALF := Vector3(0.4, 0, 0.4)
@@ -105,8 +105,8 @@ func handle(id: int, msg: String, a: Array) -> void:
 			if a.size() == 4 and a[0] is Vector3 and a[1] is Vector3 and a[2] is int and a[3] is float:
 				_shoot(p, a[0], a[1], a[2], a[3])
 		"reload":
-			if p.alive:
-				var w: Dictionary = Weapons.DATA[p.weapon]
+			var w: Dictionary = Weapons.DATA[p.weapon]
+			if p.alive and w.mag > 0:
 				p.ammo = w.mag
 				p.reload_until = _now + w.reload - 0.25
 		"pick":
@@ -208,11 +208,11 @@ func _spawn(p: Dictionary) -> void:
 	p.alive = true
 	p.ammo = Weapons.DATA[p.weapon].mag
 	p.reload_until = 0.0
-	p.protect_until = _now + SPAWN_PROTECT
+	p.protect_until = _now + (2.0 if p.bot else SPAWN_PROTECT)
 	if p.bot:
 		# Practice bots stand at a random spot on the enemy half of the map.
-		var x := _rng.randf_range(-18.0, 18.0)
-		var z := _rng.randf_range(-6.0, 22.0)
+		var x := _rng.randf_range(-0.6, 0.6) * float(_map.hx)
+		var z := _rng.randf_range(-0.1, 0.55) * float(_map.hz)
 		var f := Maps.ray_world(_map, Vector3(x, 30, z), Vector3(x, -1, z))
 		p.pos = Vector3(x, 30.0 - 31.0 * f, z)
 		p.yaw = 0.0
@@ -249,18 +249,19 @@ func _snapshot() -> void:
 # ---------- combat ----------
 
 func _shoot(p: Dictionary, origin: Vector3, dir: Vector3, seed_val: int, rtick: float) -> void:
-	if state != "match" or not p.alive or p.ammo <= 0 or _now < p.reload_until:
+	var w: Dictionary = Weapons.DATA[p.weapon]
+	if state != "match" or not p.alive or _now < p.reload_until or (w.mag > 0 and p.ammo <= 0):
 		return
 	if not origin.is_finite() or not dir.is_finite() or dir.length_squared() < 0.25 or not is_finite(rtick):
 		return
 	if origin.distance_to(p.pos + EYE) > 2.5:
 		return
 	# Fire-rate limit with 0.2 s of slack for network jitter.
-	var w: Dictionary = Weapons.DATA[p.weapon]
 	if p.shot_time > _now + 0.2:
 		return
 	p.shot_time = maxf(p.shot_time, _now - 0.2) + w.interval
-	p.ammo -= 1
+	if w.mag > 0:
+		p.ammo -= 1
 	p.protect_until = 0.0
 	_fire(p, origin, dir.normalized(), seed_val, rtick)
 
@@ -269,6 +270,7 @@ func _fire(p: Dictionary, origin: Vector3, dir: Vector3, seed_val: int, rtick: f
 	var w: Dictionary = Weapons.DATA[p.weapon]
 	var reach: float = w.range
 	var rt := clampf(rtick, tick_n - 10.0, float(tick_n))
+	var grow := 0.45 if w.melee else 0.0   # melee is forgiving: it hits a fattened box
 	var dmg := {}   # victim id -> total damage
 	for d: Vector3 in Weapons.pellet_dirs(p.weapon, dir, seed_val):
 		var to := origin + d * reach
@@ -278,7 +280,7 @@ func _fire(p: Dictionary, origin: Vector3, dir: Vector3, seed_val: int, rtick: f
 			var q: Dictionary = players[id]
 			if q.team == p.team or not q.alive:
 				continue
-			var hit: Variant = AABB(_pos_at(q, rt) - BOX_HALF, BOX_SIZE).intersects_segment(origin, to)
+			var hit: Variant = AABB(_pos_at(q, rt) - BOX_HALF, BOX_SIZE).grow(grow).intersects_segment(origin, to)
 			if hit != null:
 				var f: float = origin.distance_to(hit) / reach
 				if f < best:

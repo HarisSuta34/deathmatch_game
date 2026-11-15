@@ -19,6 +19,17 @@ The owner is new to game development: make sensible decisions, explain briefly, 
 - Controls: WASD move, mouse look, LMB shoot, RMB aim/zoom, R reload, Space jump, Shift sprint.
 - Nickname entered on the main menu.
 
+### Changes requested later by the owner (these override the list above)
+- Audio, all synthesized in code (`scripts/client/sfx.gd`, autoload `Sfx`): menu music that stops when a match starts; footsteps, jump, reload, hit sounds; a distinct shot sound per weapon; other players' shots are heard across the map (positional).
+- Menu shows a live 3D backdrop (`scripts/client/backdrop.gd`) and styled panels.
+- 4 weapons: rifle, sniper, shotgun and the melee **"Bulgarian special knife"** (swing animation, 15% faster movement). Each has its own blocky model (`Weapons.PARTS`), and the loadout screen draws icons from the same boxes.
+- Balance intent: shotgun best up close, sniper best at long range (weak close and inaccurate unscoped), rifle = most bullets.
+- Reload only on **R** (no automatic refill), with an animation; reload times differ slightly per weapon.
+- Loadout/respawn screen lasts 6 s. After spawning a player is invincible for 10 s and looks pale; it ends early when they attack.
+- Arrow keys work alongside WASD.
+- Maps are larger (about 80 x 110 m) and more detailed; decor boxes (windows, clouds, flags) have no collision.
+- Deployed: client on GitHub Pages (`gh-pages` branch, via `tools\publish_web.ps1`), server on Render (auto-deploys from `main`). Client and server share weapon/map data, so publish both together.
+
 ### Multiplayer and hosting
 - Playable in a browser from a link (like Gartic Phone): create a room (short room code) or join by code.
 - One dedicated headless Godot server built from this same project, WebSocketMultiplayerPeer. Server is authoritative over hits, health, kills, scores, timer. One server handles several rooms.

@@ -22,6 +22,7 @@ var ammo := 0
 var cooldown := 0.0
 var reload_left := 0.0
 var _capture_frame := 0
+var _step_t := 0.0
 var yaw := 0.0
 var pitch := 0.0
 var zoomed := false
@@ -50,7 +51,7 @@ func _ready() -> void:
 	pivot.position.y = 1.55
 	add_child(pivot)
 	arm = SpringArm3D.new()
-	arm.position = Vector3(0.65, 0.25, 0)
+	arm.position = Vector3(0.9, 0.8, 0)
 	arm.spring_length = 3.2
 	arm.collision_mask = 1
 	arm.margin = 0.15
@@ -91,11 +92,13 @@ func start_reload() -> void:
 	if reload_left <= 0.0 and ammo < Weapons.DATA[weapon].mag:
 		reload_left = Weapons.DATA[weapon].reload
 		Net.send("reload")
+		Sfx.play("reload", -4.0, 1.8 / reload_left)
 
 
 func _fire() -> void:
 	var w: Dictionary = Weapons.DATA[weapon]
-	ammo -= 1
+	if w.mag > 0:
+		ammo -= 1
 	cooldown = w.interval
 	# Aim point: what the crosshair is on (ray starts in front of the player, not behind).
 	var fwd := -cam.global_transform.basis.z
@@ -104,7 +107,13 @@ func _fire() -> void:
 	var hit := get_world_3d().direct_space_state.intersect_ray(q)
 	var target: Vector3 = hit.position if hit else from + fwd * 500.0
 	var origin := global_position + EYE
-	fired.emit(origin, (target - origin).normalized(), randi() & 0xFFFFFF)
+	var dir := (target - origin).normalized()
+	if weapon == "sniper" and not zoomed:
+		var s: float = Weapons.SNIPER_HIP_SPREAD
+		dir = (dir + Vector3(randf_range(-s, s), randf_range(-s, s), randf_range(-s, s))).normalized()
+	if w.melee:
+		avatar.swing()
+	fired.emit(origin, dir, randi() & 0xFFFFFF)
 	pitch = minf(pitch + w.kick, 1.4)
 
 
@@ -120,10 +129,10 @@ func _update_weapon(delta: float) -> void:
 	if active and captured:
 		var want: bool = Input.is_action_pressed("shoot") if w.auto else Input.is_action_just_pressed("shoot")
 		if want and cooldown <= 0.0 and reload_left <= 0.0:
-			if ammo > 0:
+			if ammo > 0 or w.mag == 0:
 				_fire()
-			else:
-				start_reload()
+			elif Input.is_action_just_pressed("shoot"):
+				Sfx.play("empty")   # no automatic reload: press R
 		if Input.is_action_just_pressed("reload"):
 			start_reload()
 	# Camera: zoom in when aiming; the sniper scope goes first-person.
@@ -131,7 +140,7 @@ func _update_weapon(delta: float) -> void:
 	var k := minf(1.0, delta * 14.0)
 	cam.fov = lerpf(cam.fov, w.zoom_fov if zoomed else BASE_FOV, k)
 	arm.spring_length = lerpf(arm.spring_length, 0.0 if scoped else (2.2 if zoomed else 3.2), k)
-	arm.position = arm.position.lerp(Vector3.ZERO if scoped else Vector3(0.65, 0.25, 0), k)
+	arm.position = arm.position.lerp(Vector3.ZERO if scoped else Vector3(0.9, 0.8, 0), k)
 	avatar.visible = active and arm.spring_length > 0.6
 
 
@@ -154,19 +163,25 @@ func _physics_process(delta: float) -> void:
 	var input := Input.get_vector("left", "right", "forward", "back")
 	var dir := Basis(Vector3.UP, yaw) * Vector3(input.x, 0, input.y)
 	sprinting = Input.is_action_pressed("sprint") and not zoomed and input.y < 0.0
-	var spd := SPRINT_SPEED if sprinting else SPEED
+	var spd: float = (SPRINT_SPEED if sprinting else SPEED) * Weapons.DATA[weapon].speed
 	velocity.x = move_toward(velocity.x, dir.x * spd, ACCEL * delta)
 	velocity.z = move_toward(velocity.z, dir.z * spd, ACCEL * delta)
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
 	elif Input.is_action_pressed("jump"):
 		velocity.y = JUMP
+		Sfx.play("jump", -8.0)
 	move_and_slide()
 	moving = is_on_floor() and Vector2(velocity.x, velocity.z).length() > 0.5
+	if moving:
+		_step_t -= delta * (1.4 if sprinting else 1.0)
+		if _step_t <= 0.0:
+			_step_t = 0.36
+			Sfx.play("step", -9.0, randf_range(0.85, 1.15))
 
 
 func _process(delta: float) -> void:
 	_update_weapon(delta)
 	pivot.rotation = Vector3(pitch, yaw, 0)
 	avatar.rotation.y = yaw
-	avatar.animate(delta, moving and active, sprinting, pitch)
+	avatar.animate(delta, moving and active, sprinting, pitch, reload_left > 0.0)

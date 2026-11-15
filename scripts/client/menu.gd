@@ -29,14 +29,22 @@ var _lobby := {}
 func _ready() -> void:
 	set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	var bg := ColorRect.new()
-	bg.color = Color(0.09, 0.11, 0.15)
+	bg.color = Color(0.02, 0.04, 0.1, 0.3)   # the 3D backdrop shows through
+	bg.mouse_filter = MOUSE_FILTER_IGNORE
+	theme = _make_theme()
 	bg.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	add_child(bg)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(PRESET_FULL_RECT)
 	add_child(center)
+	var panel := PanelContainer.new()
+	var sb := _box_style(Color(0.05, 0.07, 0.12, 0.86), Color(1, 0.8, 0.3))
+	sb.set_content_margin_all(26)
+	sb.set_corner_radius_all(10)
+	panel.add_theme_stylebox_override("panel", sb)
+	center.add_child(panel)
 	var holder := VBoxContainer.new()
-	center.add_child(holder)
+	panel.add_child(holder)
 	_build_main(holder)
 	_build_lobby(holder)
 	lobby_page.visible = false
@@ -50,7 +58,7 @@ func _ready() -> void:
 
 func _build_main(holder: Control) -> void:
 	main_page = _page(holder)
-	main_page.add_child(_label("BLOCK DEATHMATCH", 54))
+	main_page.add_child(_title())
 	main_page.add_child(_label("Red vs Blue team deathmatch, 2v2 up to 10v10", 18, Color(0.7, 0.75, 0.85)))
 	main_page.add_child(_gap(10))
 	nick_edit = _edit("Your nickname", 16)
@@ -75,7 +83,7 @@ func _build_main(holder: Control) -> void:
 	pb.size_flags_horizontal = SIZE_EXPAND_FILL
 	prac.add_child(pb)
 	main_page.add_child(prac)
-	main_page.add_child(_label("WASD move  |  Mouse look  |  Left click shoot  |  Right click aim\nR reload  |  Space jump  |  Shift sprint  |  Tab scoreboard  |  Esc free mouse", 14, Color(0.6, 0.65, 0.72)))
+	main_page.add_child(_label("WASD / arrows move  |  Mouse look  |  Left click shoot  |  Right click aim\nR reload  |  Space jump  |  Shift sprint  |  Tab scoreboard  |  Esc free mouse", 14, Color(0.6, 0.65, 0.72)))
 	status = _label("", 18, Color(1, 0.75, 0.4))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	main_page.add_child(status)
@@ -220,6 +228,39 @@ func _refresh() -> void:
 
 # ---------- widgets ----------
 
+func _box_style(c: Color, border := Color(0, 0, 0, 0.45)) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = c
+	sb.set_corner_radius_all(6)
+	sb.set_content_margin_all(9)
+	sb.border_width_bottom = 3
+	sb.border_color = border
+	return sb
+
+
+func _make_theme() -> Theme:
+	var th := Theme.new()
+	for type: String in ["Button", "OptionButton"]:
+		th.set_stylebox("normal", type, _box_style(Color(0.17, 0.22, 0.34)))
+		th.set_stylebox("hover", type, _box_style(Color(0.24, 0.33, 0.52)))
+		th.set_stylebox("pressed", type, _box_style(Color(0.85, 0.3, 0.25)))
+		th.set_stylebox("disabled", type, _box_style(Color(0.13, 0.14, 0.18)))
+		th.set_stylebox("focus", type, StyleBoxEmpty.new())
+	th.set_stylebox("normal", "LineEdit", _box_style(Color(0.06, 0.07, 0.1), Color(0.3, 0.4, 0.6)))
+	th.set_stylebox("focus", "LineEdit", _box_style(Color(0.06, 0.07, 0.1), Color(1, 0.8, 0.3)))
+	return th
+
+
+func _title() -> Control:
+	var h := HBoxContainer.new()
+	h.alignment = BoxContainer.ALIGNMENT_CENTER
+	h.add_theme_constant_override("separation", 14)
+	for part: Array in [["BLOCK", Color(1, 0.36, 0.33)], ["DEATHMATCH", Color(0.4, 0.62, 1)]]:
+		var l := _label(part[0], 58, part[1])
+		l.add_theme_color_override("font_outline_color", Color.BLACK)
+		l.add_theme_constant_override("outline_size", 12)
+		h.add_child(l)
+	return h
 func _page(holder: Control) -> VBoxContainer:
 	var v := VBoxContainer.new()
 	v.custom_minimum_size.x = 460

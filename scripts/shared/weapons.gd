@@ -1,27 +1,82 @@
 extends RefCounted
-# Weapon stats shared by client and server.
-# damage is per pellet; falloff = [start_m, end_m, min_damage] (linear).
+# Weapon stats and blocky models, shared by client and server.
+# damage is per pellet; falloff = [start_m, end_m, damage_at_end] (linear between).
+# mag 0 = no ammo needed (melee).
 
-const LIST := ["rifle", "sniper", "shotgun"]
+const LIST := ["rifle", "sniper", "shotgun", "knife"]
 const DATA := {
 	"rifle": {
-		"name": "Assault Rifle", "desc": "Automatic, medium damage",
-		"damage": 18, "interval": 0.1, "mag": 30, "reload": 1.8, "pellets": 1,
-		"spread": 0.012, "auto": true, "zoom_fov": 50.0, "range": 250.0,
-		"falloff": [40.0, 120.0, 10], "kick": 0.006,
+		"name": "Assault Rifle", "desc": "Automatic, 30 rounds, all-rounder",
+		"damage": 17, "interval": 0.1, "mag": 30, "reload": 1.8, "pellets": 1,
+		"spread": 0.014, "auto": true, "zoom_fov": 50.0, "range": 250.0,
+		"falloff": [35.0, 100.0, 9], "kick": 0.006, "muzzle": 0.85, "speed": 1.0, "melee": false,
 	},
 	"sniper": {
-		"name": "Sniper", "desc": "High damage, slow, scope",
-		"damage": 90, "interval": 1.4, "mag": 5, "reload": 2.6, "pellets": 1,
+		"name": "Sniper", "desc": "One-shot kill at long range, scope",
+		"damage": 60, "interval": 1.5, "mag": 5, "reload": 2.3, "pellets": 1,
 		"spread": 0.0, "auto": false, "zoom_fov": 14.0, "range": 400.0,
-		"falloff": [400.0, 401.0, 90], "kick": 0.05,
+		"falloff": [10.0, 30.0, 100], "kick": 0.05, "muzzle": 1.4, "speed": 1.0, "melee": false,
 	},
 	"shotgun": {
-		"name": "Shotgun", "desc": "9 pellets, deadly up close",
-		"damage": 13, "interval": 0.9, "mag": 6, "reload": 2.2, "pellets": 9,
-		"spread": 0.075, "auto": false, "zoom_fov": 60.0, "range": 60.0,
-		"falloff": [7.0, 30.0, 3], "kick": 0.04,
+		"name": "Shotgun", "desc": "10 pellets, deadly up close",
+		"damage": 13, "interval": 0.9, "mag": 6, "reload": 2.1, "pellets": 10,
+		"spread": 0.08, "auto": false, "zoom_fov": 60.0, "range": 50.0,
+		"falloff": [6.0, 24.0, 2], "kick": 0.04, "muzzle": 0.85, "speed": 1.0, "melee": false,
 	},
+	"knife": {
+		"name": "Bulgarian special knife", "desc": "Melee, 2 hits, move faster",
+		"damage": 60, "interval": 0.45, "mag": 0, "reload": 0.0, "pellets": 1,
+		"spread": 0.0, "auto": false, "zoom_fov": 75.0, "range": 2.8,
+		"falloff": [10.0, 11.0, 60], "kick": 0.0, "muzzle": 0.5, "speed": 1.15, "melee": true,
+	},
+}
+const SNIPER_HIP_SPREAD := 0.05   # unscoped sniper shots are inaccurate
+
+const METAL := Color(0.2, 0.2, 0.23)
+const DARK := Color(0.08, 0.08, 0.1)
+const WOOD := Color(0.55, 0.36, 0.2)
+const OLIVE := Color(0.3, 0.38, 0.22)
+const STEEL := Color(0.8, 0.82, 0.86)
+const LENS := Color(0.3, 0.55, 0.9)
+
+# Models as boxes [size, position, color]; grip at the origin, barrel towards -Z.
+# The loadout icons are drawn from the same boxes (side view).
+const PARTS := {
+	"rifle": [
+		[Vector3(0.09, 0.14, 0.5), Vector3(0, 0.02, -0.15), METAL],
+		[Vector3(0.05, 0.05, 0.4), Vector3(0, 0.04, -0.62), DARK],
+		[Vector3(0.09, 0.1, 0.26), Vector3(0, 0.02, -0.5), WOOD],
+		[Vector3(0.07, 0.12, 0.32), Vector3(0, -0.01, 0.26), WOOD],
+		[Vector3(0.06, 0.24, 0.1), Vector3(0, -0.16, -0.2), DARK],
+		[Vector3(0.06, 0.14, 0.07), Vector3(0, -0.1, 0.03), DARK],
+		[Vector3(0.03, 0.06, 0.03), Vector3(0, 0.1, -0.78), DARK],
+	],
+	"sniper": [
+		[Vector3(0.08, 0.12, 0.7), Vector3(0, 0.02, -0.15), OLIVE],
+		[Vector3(0.04, 0.04, 0.8), Vector3(0, 0.04, -0.9), DARK],
+		[Vector3(0.07, 0.07, 0.12), Vector3(0, 0.04, -1.34), DARK],
+		[Vector3(0.08, 0.17, 0.36), Vector3(0, -0.02, 0.36), OLIVE],
+		[Vector3(0.07, 0.08, 0.38), Vector3(0, 0.15, -0.2), DARK],
+		[Vector3(0.09, 0.1, 0.05), Vector3(0, 0.15, -0.41), LENS],
+		[Vector3(0.02, 0.22, 0.02), Vector3(0.05, -0.12, -0.72), DARK],
+		[Vector3(0.02, 0.22, 0.02), Vector3(-0.05, -0.12, -0.72), DARK],
+		[Vector3(0.06, 0.1, 0.12), Vector3(0, -0.09, -0.15), DARK],
+		[Vector3(0.06, 0.14, 0.07), Vector3(0, -0.1, 0.05), DARK],
+	],
+	"shotgun": [
+		[Vector3(0.1, 0.15, 0.36), Vector3(0, 0.02, -0.1), METAL],
+		[Vector3(0.07, 0.07, 0.56), Vector3(0, 0.06, -0.55), DARK],
+		[Vector3(0.06, 0.06, 0.46), Vector3(0, -0.02, -0.5), METAL],
+		[Vector3(0.12, 0.11, 0.2), Vector3(0, -0.03, -0.45), WOOD],
+		[Vector3(0.09, 0.15, 0.32), Vector3(0, -0.03, 0.24), WOOD],
+		[Vector3(0.06, 0.13, 0.07), Vector3(0, -0.1, 0.04), WOOD],
+	],
+	"knife": [
+		[Vector3(0.05, 0.06, 0.15), Vector3(0, 0, 0), DARK],
+		[Vector3(0.1, 0.1, 0.03), Vector3(0, 0, -0.09), METAL],
+		[Vector3(0.02, 0.08, 0.3), Vector3(0, 0.005, -0.25), STEEL],
+		[Vector3(0.02, 0.045, 0.1), Vector3(0, -0.012, -0.45), STEEL],
+	],
 }
 
 

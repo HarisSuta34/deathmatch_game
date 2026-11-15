@@ -12,6 +12,7 @@ var root: Control
 var cross: Control
 var hp_label: Label
 var hp_fill: ColorRect
+var hp_bg: ColorRect
 var ammo_label: Label
 var weapon_label: Label
 var score_labels := []
@@ -50,7 +51,7 @@ func _ready() -> void:
 
 	hp_label = _label("", 34)
 	_place(hp_label, Control.PRESET_BOTTOM_LEFT, 24, -84, 300, 46)
-	var hp_bg := ColorRect.new()
+	hp_bg = ColorRect.new()
 	hp_bg.color = Color(0, 0, 0, 0.5)
 	_place(hp_bg, Control.PRESET_BOTTOM_LEFT, 24, -36, 220, 12)
 	hp_fill = ColorRect.new()
@@ -99,22 +100,24 @@ func _process(delta: float) -> void:
 	hp_label.text = "HP %d" % p.hp
 	hp_fill.size.x = 220.0 * p.hp / 100.0
 	hp_fill.color = Color(0.3, 0.9, 0.35) if p.hp > 35 else Color(0.95, 0.3, 0.25)
-	ammo_label.text = "%d / %d" % [p.ammo, w.mag]
+	ammo_label.text = "%d / %d" % [p.ammo, w.mag] if w.mag > 0 else ""
 	weapon_label.text = "RELOADING..." if p.reload_left > 0.0 else w.name
 	var t := maxi(0, ceili(game.time_left))
 	timer_label.text = "%02d:%02d" % [t / 60, t % 60]
 	score_labels[0].text = "RED  %d" % game.scores[0]
 	score_labels[1].text = "%d  BLUE" % game.scores[1]
 
-	for c: Control in [hp_label, hp_fill, ammo_label, weapon_label]:
+	for c: Control in [hp_label, hp_bg, hp_fill, ammo_label, weapon_label]:
 		c.visible = p.active
 	leave_btn.visible = Input.mouse_mode != Input.MOUSE_MODE_CAPTURED
 
 	_msg_t -= delta
 	if p.active and Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		msg_label.text = "Click to play"
+	elif p.active and w.mag > 0 and p.ammo == 0 and p.reload_left <= 0.0:
+		msg_label.text = "Press R to reload"
 	elif p.active and game.protected:
-		msg_label.text = "SPAWN PROTECTION"
+		msg_label.text = "INVINCIBLE  (ends when you attack)"
 	elif _msg_t <= 0.0:
 		msg_label.text = ""
 	flash.color.a = maxf(0.0, flash.color.a - delta * 0.9)
@@ -233,8 +236,7 @@ func _build_loadout() -> void:
 	for i in Weapons.LIST.size():
 		var w: String = Weapons.LIST[i]
 		var b := Button.new()
-		b.text = "[%d]  %s\n%s" % [i + 1, Weapons.DATA[w].name, Weapons.DATA[w].desc]
-		b.custom_minimum_size = Vector2(230, 90)
+		b.custom_minimum_size = Vector2(215, 170)
 		b.toggle_mode = true
 		b.button_group = group
 		b.button_pressed = w == "rifle"
@@ -242,12 +244,49 @@ func _build_loadout() -> void:
 		b.pressed.connect(_pick.bind(w))
 		h.add_child(b)
 		loadout_buttons[w] = b
+		var box := VBoxContainer.new()
+		box.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT, Control.PRESET_MODE_MINSIZE, 8)
+		box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		b.add_child(box)
+		var icon := Control.new()
+		icon.custom_minimum_size = Vector2(190, 84)
+		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		icon.draw.connect(_draw_weapon.bind(icon, w))
+		box.add_child(icon)
+		for line: Array in [["[%d]  %s" % [i + 1, Weapons.DATA[w].name], 17, Color.WHITE], [Weapons.DATA[w].desc, 13, Color(0.78, 0.8, 0.85)]]:
+			var lab := _label(line[0], line[1], line[2])
+			lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			lab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			box.add_child(lab)
 	loadout_timer = _label("", 20)
 	loadout_timer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(loadout_timer)
-	var hint := _label("Click or press 1-3. No choice = keep your previous weapon.", 15, Color(0.8, 0.8, 0.8))
+	var hint := _label("Click or press 1-4. No choice = keep your previous weapon.", 15, Color(0.8, 0.8, 0.8))
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(hint)
+
+
+# Side view of a weapon, drawn from the same boxes as its 3D model.
+func _draw_weapon(icon: Control, w: String) -> void:
+	var rects := []
+	var bounds := Rect2()
+	for part: Array in Weapons.PARTS[w]:
+		var s: Vector3 = part[0]
+		var p: Vector3 = part[1]
+		var r := Rect2(-p.z - s.z * 0.5, -p.y - s.y * 0.5, s.z, s.y)
+		bounds = r if rects.is_empty() else bounds.merge(r)
+		rects.append([r, part[2]])
+	var k := minf(minf(icon.size.x / bounds.size.x, icon.size.y / bounds.size.y) * 0.9, 300.0)
+	var off := icon.size * 0.5 - bounds.get_center() * k
+	for e: Array in rects:
+		var r: Rect2 = e[0]
+		var c: Color = e[1]
+		icon.draw_rect(Rect2(r.position * k + off, r.size * k).grow(1.5), Color(0, 0, 0, 0.6))
+	for e: Array in rects:
+		var r: Rect2 = e[0]
+		var c: Color = e[1]
+		icon.draw_rect(Rect2(r.position * k + off, r.size * k), c.lightened(0.25))
 
 
 func _pick(w: String) -> void:

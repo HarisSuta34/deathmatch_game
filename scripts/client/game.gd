@@ -94,8 +94,10 @@ func _on_msg(msg: String, a: Array) -> void:
 			if a[0] == my_id:
 				player.hp = a[1]
 				hud.damage_flash()
+				Sfx.play("hurt", -4.0)
 			if a[2] == my_id:
 				hud.hit_marker(false)
+				Sfx.play("hit", -6.0)
 		"kill":
 			var k: int = a[0]
 			var v: int = a[1]
@@ -109,10 +111,12 @@ func _on_msg(msg: String, a: Array) -> void:
 			if v == my_id:
 				player.die()
 				hud.damage_flash()
+				Sfx.play("hurt")
 				hud.center_msg("Killed by %s" % nick(k) if k != 0 else "You fell", 3.0)
 				hud.show_loadout(a[4])
 			if k == my_id:
 				hud.hit_marker(true)
+				Sfx.play("kill", -4.0)
 		"left":
 			if avatars.has(a[0]):
 				avatars[a[0]].queue_free()
@@ -132,7 +136,7 @@ func _process(delta: float) -> void:
 		_send_acc += delta
 		if _send_acc >= 1.0 / TICK_RATE:
 			_send_acc = 0.0
-			var f := (4 if player.moving else 0) | (8 if player.sprinting else 0)
+			var f := (4 if player.moving else 0) | (8 if player.sprinting else 0) | (16 if player.reload_left > 0.0 else 0)
 			Net.send("state", [player.global_position, player.yaw, player.pitch, f])
 
 
@@ -154,13 +158,13 @@ func _interpolate(delta: float) -> void:
 	var ids: PackedInt32Array = b.ids
 	var db: PackedFloat32Array = b.data
 	var da: PackedFloat32Array = a.data
-	var blink := fmod(Time.get_ticks_msec() / 1000.0, 0.24) < 0.14
 	for j in ids.size():
 		var id := ids[j]
 		var o := j * 6
 		var flags := int(db[o + 5])
 		if id == my_id:
 			protected = (flags & 2) != 0
+			player.avatar.set_pale(protected)
 			continue
 		if not avatars.has(id):
 			continue
@@ -169,7 +173,8 @@ func _interpolate(delta: float) -> void:
 			av.visible = false
 			av.position.y = -500.0
 			continue
-		av.visible = (flags & 2) == 0 or blink   # blink while spawn-protected
+		av.visible = true
+		av.set_pale((flags & 2) != 0)   # pale while spawn-protected
 		var pb := Vector3(db[o], db[o + 1], db[o + 2])
 		var pa := pb
 		var ya := db[o + 3]
@@ -183,7 +188,7 @@ func _interpolate(delta: float) -> void:
 				xa = da[i * 6 + 4]
 		av.position = pa.lerp(pb, k)
 		av.rotation.y = lerp_angle(ya, db[o + 3], k)
-		av.animate(delta, (flags & 4) != 0, (flags & 8) != 0, lerpf(xa, db[o + 4], k))
+		av.animate(delta, (flags & 4) != 0, (flags & 8) != 0, lerpf(xa, db[o + 4], k), (flags & 16) != 0)
 
 
 func _on_fired(origin: Vector3, dir: Vector3, seed_val: int) -> void:
@@ -195,6 +200,13 @@ func _tracers(id: int, origin: Vector3, dir: Vector3, seed_val: int) -> void:
 	var wname: String = info[id].weapon
 	var av: Node3D = player.avatar if id == my_id else avatars.get(id)
 	if av == null:
+		return
+	if id == my_id:
+		Sfx.play("shot_" + wname, -3.0)
+	else:
+		Sfx.play_at("shot_" + wname, av.position + Vector3(0, 1.4, 0), self, 3.0)
+	if Weapons.DATA[wname].melee:
+		av.swing()
 		return
 	var from: Vector3 = av.muzzle()
 	var space := get_world_3d().direct_space_state
@@ -220,19 +232,4 @@ func _tracers(id: int, origin: Vector3, dir: Vector3, seed_val: int) -> void:
 
 func _build_world(map_id: int) -> void:
 	map = Maps.get_map(map_id)
-	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.55, 0.75, 0.95)
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color.WHITE
-	env.ambient_light_energy = 0.5
-	var we := WorldEnvironment.new()
-	we.environment = env
-	add_child(we)
-	var sun := DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-50, 35, 0)
-	sun.light_energy = 0.7
-	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 90.0
-	add_child(sun)
-	add_child(Maps.build(map))
+	Maps.build_scene(self, map)

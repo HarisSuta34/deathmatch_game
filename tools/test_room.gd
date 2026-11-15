@@ -2,6 +2,8 @@ extends SceneTree
 # Logic test for the room simulation (no graphics, no network).
 # Run: tools\godot.ps1 --headless --path . -s tools/test_room.gd
 
+const Weapons = preload("res://scripts/shared/weapons.gd")
+
 var log := []
 
 
@@ -25,7 +27,7 @@ func _init() -> void:
 	for id: int in r.players:
 		teams[r.players[id].team] += 1
 	_expect("teams equal", teams == [2, 2])
-	for i in 110:
+	for i in 130:
 		r.tick(0.05)
 	var a: Dictionary
 	var b: Dictionary
@@ -42,7 +44,7 @@ func _init() -> void:
 	var dir := (Vector3(10, 1.1, -20) - origin).normalized()
 	r.handle(a.id, "shoot", [origin, dir, 1, float(r.tick_n)])
 	_expect("spawn protection blocks damage", b.hp == 100)
-	for i in 60:
+	for i in 220:
 		r.tick(0.05)
 	for i in 10:
 		r.handle(a.id, "shoot", [origin, dir, i, float(r.tick_n)])
@@ -52,13 +54,21 @@ func _init() -> void:
 	for i in 10:
 		r.handle(a.id, "shoot", [origin, dir, i, float(r.tick_n)])
 	_expect("fire rate limited", before - a.ammo <= 5)   # small burst allowance for network jitter
-	for i in 70:
+	for i in 130:
 		r.tick(0.05)
 	_expect("respawned", b.alive and b.hp == 100)
 	r.handle(a.id, "state", [Vector3(0, 0.1, -10), 0.0, 0.0, 0])
 	r.handle(b.id, "state", [Vector3(0, 0.1, 10), 0.0, 0.0, 0])
-	for i in 60:
+	for i in 220:
 		r.tick(0.05)
+	_expect("clear shot hits", _dmg(r, a, b, Vector3(10, 0.1, -10), Vector3(10, 0.1, -20)) > 0)
+	r.handle(a.id, "pick", ["knife"])
+	_expect("sniper weak up close, strong far", Weapons.damage_at("sniper", 5.0) < 70 and Weapons.damage_at("sniper", 60.0) >= 100)
+	_expect("shotgun strong close, weak far", Weapons.damage_at("shotgun", 3.0) * 10 > 100 and Weapons.damage_at("shotgun", 40.0) * 10 < 30)
+	b.hp = 100
+	r.handle(a.id, "state", [Vector3(0, 0.1, -10), 0.0, 0.0, 0])
+	r.handle(b.id, "state", [Vector3(0, 0.1, 10), 0.0, 0.0, 0])
+	r.tick(0.2)
 	r.handle(a.id, "shoot", [Vector3(0, 1.6, -10), Vector3(0, 0, 1), 1, float(r.tick_n)])
 	_expect("wall blocks shot", b.hp == 100)
 	r.remove_player(b.id)
@@ -81,6 +91,17 @@ func _init() -> void:
 				ok = ok and absf((9.0 - 10.0 * f) + 0.1) < 0.2
 		_expect("map %d spawns clear" % m, ok)
 	quit()
+
+
+# Moves a and b, lets a fire once at b, returns the damage dealt.
+func _dmg(r: RefCounted, a: Dictionary, b: Dictionary, pa: Vector3, pb: Vector3) -> int:
+	r.handle(a.id, "state", [pa, 0.0, 0.0, 0])
+	r.handle(b.id, "state", [pb, 0.0, 0.0, 0])
+	r.tick(0.5)
+	var before: int = b.hp
+	var origin := pa + Vector3(0, 1.5, 0)
+	r.handle(a.id, "shoot", [origin, (pb + Vector3(0, 1, 0) - origin).normalized(), 1, float(r.tick_n)])
+	return before - b.hp
 
 
 func _last(msg: String) -> Array:
