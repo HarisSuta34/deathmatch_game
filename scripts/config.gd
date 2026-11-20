@@ -8,6 +8,21 @@ const LOCAL_URL := "ws://localhost:9080"
 const PRODUCTION_URL := "wss://deathmatch-game.onrender.com"
 
 
+static var _touch := -1
+
+
+# Phones and tablets (coarse pointer) get on-screen controls. `++ --touch` forces it for testing.
+static func touch_device() -> bool:
+	if _touch < 0:
+		_touch = 0
+		if OS.has_feature("web"):
+			var v: Variant = JavaScriptBridge.eval("(window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 1 : 0", true)
+			_touch = 1 if int(v) == 1 else 0
+		if "--touch" in OS.get_cmdline_user_args():
+			_touch = 1
+	return _touch == 1
+
+
 static func server_url() -> String:
 	if OS.has_feature("web"):
 		# A "?server=wss://..." in the page address overrides everything.

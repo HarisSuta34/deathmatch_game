@@ -29,6 +29,9 @@ func init() -> void:
 		"hurt": _wav(_tone(0.18, 220.0, 110.0, 12.0, 0.6), RATE),
 		"empty": _wav(_blast(0.04, 120.0, 0.9, 1500.0, 0.3, 0.4), RATE),
 	}
+	var heal := _tone(0.45, 440.0, 990.0, 5.0, 0.35)
+	_mix(heal, _tone(0.3, 660.0, 1320.0, 7.0, 0.25), int(0.12 * RATE))
+	_streams["heal"] = _wav(heal, RATE)
 	var kill := _tone(0.3, 660.0, 660.0, 9.0, 0.4)
 	_mix(kill, _tone(0.2, 990.0, 990.0, 9.0, 0.4), int(0.09 * RATE))
 	_streams["kill"] = _wav(kill, RATE)

@@ -24,7 +24,7 @@ const DATA := {
 		"falloff": [6.0, 24.0, 2], "kick": 0.04, "muzzle": 0.85, "speed": 1.0, "melee": false,
 	},
 	"knife": {
-		"name": "Bulgarian special knife", "desc": "Melee, 2 hits, move faster",
+		"name": "Bulgarian Special Knife", "desc": "Melee, 2 hits, move faster",
 		"damage": 60, "interval": 0.45, "mag": 0, "reload": 0.0, "pellets": 1,
 		"spread": 0.0, "auto": false, "zoom_fov": 75.0, "range": 2.8,
 		"falloff": [10.0, 11.0, 60], "kick": 0.0, "muzzle": 0.5, "speed": 1.15, "melee": true,
@@ -71,13 +71,43 @@ const PARTS := {
 		[Vector3(0.09, 0.15, 0.32), Vector3(0, -0.03, 0.24), WOOD],
 		[Vector3(0.06, 0.13, 0.07), Vector3(0, -0.1, 0.04), WOOD],
 	],
-	"knife": [
-		[Vector3(0.05, 0.06, 0.15), Vector3(0, 0, 0), DARK],
-		[Vector3(0.1, 0.1, 0.03), Vector3(0, 0, -0.09), METAL],
-		[Vector3(0.02, 0.08, 0.3), Vector3(0, 0.005, -0.25), STEEL],
-		[Vector3(0.02, 0.045, 0.1), Vector3(0, -0.012, -0.45), STEEL],
-	],
 }
+const BRASS := Color(0.85, 0.65, 0.25)
+const EDGE := Color(0.97, 0.98, 1.0)
+
+static var _knife: Array
+
+
+static func parts(w: String) -> Array:
+	return _knife_parts() if w == "knife" else PARTS[w]
+
+
+# Knife: handle with rings and pommel, brass guard, and a blade whose spine is straight
+# while the cutting edge curves up to a sharp point (built from thin slices).
+static func _knife_parts() -> Array:
+	if _knife.is_empty():
+		var l := []
+		l.append([Vector3(0.05, 0.07, 0.17), Vector3(0, -0.005, 0.01), Color(0.3, 0.18, 0.1)])
+		l.append([Vector3(0.058, 0.078, 0.022), Vector3(0, -0.005, 0.05), DARK])
+		l.append([Vector3(0.058, 0.078, 0.022), Vector3(0, -0.005, -0.03), DARK])
+		l.append([Vector3(0.062, 0.085, 0.035), Vector3(0, -0.005, 0.105), BRASS])
+		l.append([Vector3(0.07, 0.15, 0.03), Vector3(0, 0.0, -0.088), BRASS])
+		var spine := 0.045
+		var full := 0.095
+		var n := 12
+		var length := 0.44
+		var dz := length / n
+		for i in n:
+			var t := (i + 0.5) / n
+			var h := maxf(full * sqrt(maxf(0.0, 1.0 - pow(t, 2.2))), 0.012)
+			var z := -0.103 - dz * (i + 0.5)
+			var edge := minf(0.014, h * 0.4)
+			l.append([Vector3(0.022, h - edge, dz), Vector3(0, spine - (h - edge) * 0.5, z), STEEL])
+			l.append([Vector3(0.018, edge, dz), Vector3(0, spine - h + edge * 0.5, z), EDGE])
+			if t < 0.6:
+				l.append([Vector3(0.026, 0.012, dz), Vector3(0, spine - 0.022, z), Color(0.55, 0.57, 0.62)])
+		_knife = l
+	return _knife
 
 
 # Deterministic pellet directions: client (for tracers) and server (for hits)

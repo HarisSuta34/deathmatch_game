@@ -30,6 +30,22 @@ The owner is new to game development: make sensible decisions, explain briefly, 
 - Maps are larger (about 80 x 110 m) and more detailed; decor boxes (windows, clouds, flags) have no collision.
 - Deployed: client on GitHub Pages (`gh-pages` branch, via `tools\publish_web.ps1`), server on Render (auto-deploys from `main`). Client and server share weapon/map data, so publish both together.
 
+### Playtest round 2 (these override anything above)
+- Camera never clips into walls: `player.gd` sweeps a sphere from the head to the camera spot (snaps in, eases out). No SpringArm.
+- Movement: diagonals normalized; acceleration/braking; body yaw smoothed; hips/legs turn toward the move direction (`avatar.gd`); walk/run cycle, jump pose, per-weapon reload animations, recoil, weapon sway.
+- Crouch: C or Ctrl, **toggle** (a held Ctrl+W/Ctrl+R would close/reload the browser tab). Lowers model, camera and hitbox (server: `FLAG_CROUCH`, 1.25 m box), half speed. Synced via snapshot flag bits (see `game.gd` F_* constants).
+- Hit flash (white→red overlay) on any damaged player, seen by all.
+- Spawn protection: none at match start; 10 s after every respawn, lasts the full 10 s even while shooting (server `protect_next`). Shown as a cyan shield shell + tint, and an "INVINCIBLE n" timer for yourself.
+- Death: 10 s respawn; death screen = live scoreboard (kills/deaths), match timer, countdown, weapon picker.
+- Match intro: 8 s (`WARMUP`) screen with both teams side by side (animated) and the weapon picker.
+- Friendly fire is impossible (server skips teammates; covered by the test).
+- Heal zone (server-authoritative, `room.gd` `_update_heal`): appears 6-10 s after the intro, then 15-25 s after each pickup, at a random open-ground spot outside both bases and at least 15 m from the last one. Heals to full; full-health players get "Health already full" and the zone stays.
+- Team tags: teammates green name + diamond marker visible through walls; enemies orange name hidden behind walls.
+- Touch devices (`Config.touch_device()` = coarse pointer; `++ --touch` forces it): `touch.gd` joystick/look/buttons; mouse clicks emulated from touches are ignored for shooting (player.gd reads real mouse buttons, device != -1); nickname/room code use `window.prompt`; portrait shows a "rotate your phone" screen.
+- Desktop AIM toggle button + Q key (for touchpads); right click still works.
+- Main menu "Controls" page.
+- Knife model generated in `Weapons._knife_parts()` (curved edge, point, guard, handle); name "Bulgarian Special Knife".
+
 ### Multiplayer and hosting
 - Playable in a browser from a link (like Gartic Phone): create a room (short room code) or join by code.
 - One dedicated headless Godot server built from this same project, WebSocketMultiplayerPeer. Server is authoritative over hits, health, kills, scores, timer. One server handles several rooms.

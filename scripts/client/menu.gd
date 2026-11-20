@@ -13,6 +13,7 @@ var lobby_page: VBoxContainer
 var nick_edit: LineEdit
 var code_edit: LineEdit
 var url_edit: LineEdit
+var controls_page: VBoxContainer
 var practice_map: OptionButton
 var status: Label
 var code_label: Label
@@ -47,7 +48,12 @@ func _ready() -> void:
 	panel.add_child(holder)
 	_build_main(holder)
 	_build_lobby(holder)
+	_build_controls(holder)
 	lobby_page.visible = false
+	controls_page.visible = false
+	if Config.touch_device():
+		_touch_text(nick_edit, "Your nickname")
+		_touch_text(code_edit, "Room code")
 	Net.message.connect(_on_msg)
 	Net.connected.connect(_on_connected)
 	Net.disconnected.connect(_on_disconnected)
@@ -83,7 +89,9 @@ func _build_main(holder: Control) -> void:
 	pb.size_flags_horizontal = SIZE_EXPAND_FILL
 	prac.add_child(pb)
 	main_page.add_child(prac)
-	main_page.add_child(_label("WASD / arrows move  |  Mouse look  |  Left click shoot  |  Right click aim\nR reload  |  Space jump  |  Shift sprint  |  Tab scoreboard  |  Esc free mouse", 14, Color(0.6, 0.65, 0.72)))
+	main_page.add_child(_button("Controls", func() -> void:
+		main_page.visible = false
+		controls_page.visible = true))
 	status = _label("", 18, Color(1, 0.75, 0.4))
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	main_page.add_child(status)
@@ -179,7 +187,72 @@ func _on_disconnected() -> void:
 	_show_main("Could not reach the server, or the connection was lost.")
 
 
+const DESKTOP_CONTROLS := [
+	["W A S D  or  arrow keys", "Move (two keys = diagonal)"],
+	["Mouse", "Look around"],
+	["Left click", "Shoot"],
+	["Right click,  Q  or  AIM button", "Aim / sniper scope"],
+	["R", "Reload"],
+	["Space", "Jump"],
+	["Shift", "Sprint"],
+	["C  or  Ctrl", "Crouch / stand up"],
+	["Tab", "Scoreboard"],
+	["1 - 4", "Choose weapon (loadout screen)"],
+	["Esc", "Free the mouse cursor"],
+]
+const TOUCH_CONTROLS := [
+	["Left thumb", "Joystick: move (push fully forward to sprint)"],
+	["Drag on the right", "Look around"],
+	["FIRE", "Shoot (hold)"],
+	["AIM", "Aim / scope on or off"],
+	["R", "Reload"],
+	["JUMP", "Jump"],
+	["CROUCH", "Crouch / stand up"],
+	["SCORE", "Scoreboard (hold)"],
+	["Tap a weapon card", "Choose weapon"],
+]
+
+
+func _build_controls(holder: Control) -> void:
+	controls_page = _page(holder)
+	controls_page.custom_minimum_size.x = 900
+	controls_page.add_child(_label("CONTROLS", 40, Color(1, 0.85, 0.3)))
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 40)
+	controls_page.add_child(cols)
+	for part: Array in [["Keyboard and mouse", DESKTOP_CONTROLS], ["Phone / tablet (touch)", TOUCH_CONTROLS]]:
+		var v := VBoxContainer.new()
+		v.size_flags_horizontal = SIZE_EXPAND_FILL
+		cols.add_child(v)
+		v.add_child(_label(part[0], 22, Color(0.5, 0.75, 1)))
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 14)
+		v.add_child(grid)
+		for row: Array in part[1]:
+			var k := _label(row[0], 16, Color(1, 0.9, 0.5))
+			k.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+			grid.add_child(k)
+			var d := _label(row[1], 16)
+			d.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			grid.add_child(d)
+	controls_page.add_child(_button("Back", func() -> void: _show_main("")))
+
+
+# Phones: Godot's text field cannot open the on-screen keyboard reliably on the web,
+# so tapping the field opens the browser's own text prompt instead.
+func _touch_text(e: LineEdit, title: String) -> void:
+	e.editable = false
+	e.add_theme_color_override("font_uneditable_color", Color.WHITE)
+	e.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed and OS.has_feature("web"):
+			var v: Variant = JavaScriptBridge.eval("window.prompt(%s, %s)" % [JSON.stringify(title), JSON.stringify(e.text)], true)
+			if v is String:
+				e.text = (v as String).strip_edges().left(e.max_length))
+
+
 func _show_main(text: String) -> void:
+	controls_page.visible = false
 	lobby_page.visible = false
 	main_page.visible = true
 	status.text = text

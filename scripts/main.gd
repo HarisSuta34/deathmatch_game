@@ -33,6 +33,8 @@ func _ready() -> void:
 	Net.message.connect(_on_msg)
 	Net.disconnected.connect(_end_game)
 	Sfx.init()
+	if Config.touch_device():
+		_setup_portrait_hint()
 	menu = Menu.new()
 	add_child(menu)
 	_end_game()
@@ -42,7 +44,7 @@ func _ready() -> void:
 		if opt.has("weapon"):
 			Net.send("pick", [opt.weapon])
 	if opt.has("shot"):
-		_screenshot(opt.shot, float(opt.get("shot-delay", 2)))
+		_screenshot(opt.shot, float(opt.get("shot-delay", 2)), opt)
 
 
 func _start_server(opt: Dictionary) -> void:
@@ -95,9 +97,19 @@ func _end_game() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
-# Dev helper: `++ --shot=file.png [--shot-delay=2]` saves a screenshot and quits.
-func _screenshot(path: String, delay: float) -> void:
+# Dev helper: `++ --shot=file.png [--shot-delay=2] [--pose=x,z,yaw,pitch] [--hud=death]`
+# saves a screenshot and quits.
+func _screenshot(path: String, delay: float, opt: Dictionary) -> void:
 	await get_tree().create_timer(delay).timeout
+	if game and opt.has("pose"):
+		var v: PackedFloat64Array = (opt.pose as String).split_floats(",")
+		game.player.global_position = Vector3(v[0], 0.1, v[1])
+		game.player.yaw = v[2]
+		game.player.pitch = v[3] if v.size() > 3 else 0.0
+		await get_tree().create_timer(0.5).timeout
+	if game and opt.get("hud", "") == "death":
+		game.hud.show_death(-1, 7.5)
+		await get_tree().create_timer(0.6).timeout
 	get_viewport().get_texture().get_image().save_png(path)
 	get_tree().quit()
 
@@ -106,16 +118,36 @@ func _setup_input() -> void:
 	var keys := {
 		"forward": [KEY_W, KEY_UP], "back": [KEY_S, KEY_DOWN], "left": [KEY_A, KEY_LEFT], "right": [KEY_D, KEY_RIGHT],
 		"jump": [KEY_SPACE], "sprint": [KEY_SHIFT], "reload": [KEY_R], "scores": [KEY_TAB],
+		"crouch": [KEY_C, KEY_CTRL], "aim_toggle": [KEY_Q],
 	}
+	# Mouse buttons (shoot/aim) are read directly in player.gd, so that taps on a
+	# touchscreen (which Godot also reports as mouse clicks) never fire the gun.
 	for a: String in keys:
 		InputMap.add_action(a)
 		for key: Key in keys[a]:
 			var e := InputEventKey.new()
 			e.physical_keycode = key
 			InputMap.action_add_event(a, e)
-	var buttons := {"shoot": MOUSE_BUTTON_LEFT, "aim": MOUSE_BUTTON_RIGHT}
-	for a: String in buttons:
-		InputMap.add_action(a)
-		var e := InputEventMouseButton.new()
-		e.button_index = buttons[a]
-		InputMap.action_add_event(a, e)
+
+
+# Phones held upright: ask to rotate (the game is laid out for landscape).
+func _setup_portrait_hint() -> void:
+	var layer := CanvasLayer.new()
+	layer.layer = 100
+	add_child(layer)
+	var bg := ColorRect.new()
+	bg.color = Color(0.05, 0.06, 0.1)
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	layer.add_child(bg)
+	var l := Label.new()
+	l.text = "Please rotate your phone\nto landscape"
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", 90)
+	l.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.add_child(l)
+	var update := func() -> void:
+		var s := get_viewport().get_visible_rect().size
+		layer.visible = s.y > s.x
+	get_viewport().size_changed.connect(update)
+	update.call()

@@ -38,4 +38,4 @@ func _process(delta: float) -> void:
 	cam.position = Vector3(sin(_angle) * 44.0, 19.0, cos(_angle) * 44.0)
 	cam.look_at(Vector3(0, 3, 0))
 	for av: Node3D in avatars:
-		av.animate(delta, false, false, 0.0)
+		av.animate(delta, Vector3.ZERO, false, 0.0)
