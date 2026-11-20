@@ -27,6 +27,7 @@ const CROUCH_EYE := 1.05
 const CAM_OFFSET := Vector3(0.9, 0.55, 3.4)      # right, up, back from the head
 const CAM_OFFSET_AIM := Vector3(0.75, 0.4, 2.2)
 const CAM_RADIUS := 0.3
+const SHOULDER := 0.55     # shots leave from this far right of the head
 const STAND_H := 1.8
 const CROUCH_H := 1.25
 
@@ -39,6 +40,7 @@ var reload_left := 0.0
 var yaw := 0.0
 var pitch := 0.0
 var zoomed := false
+var aim_blocked := false   # a wall is between the gun and the crosshair target
 var moving := false
 var sprinting := false
 var crouching := false
@@ -214,6 +216,7 @@ func _process(delta: float) -> void:
 	var vel := velocity if active else Vector3.ZERO
 	avatar.animate(delta, vel, sprinting, pitch, reload_left > 0.0, crouching, airborne and active)
 	_update_camera(delta)
+	aim_blocked = active and not Weapons.DATA[weapon].melee and aim_solution()[2]
 
 
 func _update_weapon(delta: float) -> void:
@@ -273,20 +276,38 @@ func _update_camera(delta: float) -> void:
 	avatar.visible = active and _cam_off.length() * _cam_frac > 0.7
 
 
+# Where a shot starts and where it goes: [origin, target, blocked].
+# Target = what the crosshair is on (camera ray, started level with the player so walls
+# behind the player are ignored). Origin = the right shoulder, on the camera's side, so
+# peeking around a corner works the way the camera shows it. The shoulder point is pulled
+# back toward the head if a wall is in between, so shots never start inside a wall.
+# blocked = a wall sits between the shoulder and the crosshair target (crosshair turns red).
+func aim_solution() -> Array:
+	var space := get_world_3d().direct_space_state
+	var fwd := -cam.global_transform.basis.z
+	var head := global_position + Vector3(0, eye, 0)
+	var from := cam.global_position + fwd * maxf(0.0, (head - cam.global_position).dot(fwd))
+	var hit := space.intersect_ray(PhysicsRayQueryParameters3D.create(from, from + fwd * 500.0, 3))
+	var target: Vector3 = hit.position if hit else from + fwd * 500.0
+	var origin := head + Basis(Vector3.UP, yaw) * Vector3(SHOULDER, 0.1, 0)
+	var side := space.intersect_ray(PhysicsRayQueryParameters3D.create(head, origin, 1))
+	if side:
+		origin = head.lerp(side.position, 0.8)
+	var blocked := false
+	var path := space.intersect_ray(PhysicsRayQueryParameters3D.create(origin, target, 1))
+	if path and (path.position as Vector3).distance_to(target) > 0.6:
+		blocked = true
+	return [origin, target, blocked]
+
+
 func _fire() -> void:
 	var w: Dictionary = Weapons.DATA[weapon]
 	if w.mag > 0:
 		ammo -= 1
 	cooldown = w.interval
-	# Aim point = what the crosshair is on. The ray starts level with the player's head,
-	# so walls between the camera and the player are not hit.
-	var fwd := -cam.global_transform.basis.z
-	var head := global_position + Vector3(0, eye, 0)
-	var from := cam.global_position + fwd * maxf(0.0, (head - cam.global_position).dot(fwd))
-	var q := PhysicsRayQueryParameters3D.create(from, from + fwd * 500.0, 3)
-	var hit := get_world_3d().direct_space_state.intersect_ray(q)
-	var target: Vector3 = hit.position if hit else from + fwd * 500.0
-	var origin := head
+	var sol := aim_solution()
+	var origin: Vector3 = sol[0]
+	var target: Vector3 = sol[1]
 	var dir := (target - origin).normalized()
 	if weapon == "sniper" and not zoomed:
 		var s: float = Weapons.SNIPER_HIP_SPREAD

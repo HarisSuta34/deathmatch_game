@@ -6,10 +6,10 @@ extends RefCounted
 const LIST := ["rifle", "sniper", "shotgun", "knife"]
 const DATA := {
 	"rifle": {
-		"name": "Assault Rifle", "desc": "Automatic, 30 rounds, all-rounder",
+		"name": "Assault Rifle", "desc": "Automatic, 30 rounds, good range",
 		"damage": 17, "interval": 0.1, "mag": 30, "reload": 1.8, "pellets": 1,
-		"spread": 0.014, "auto": true, "zoom_fov": 50.0, "range": 250.0,
-		"falloff": [35.0, 100.0, 9], "kick": 0.006, "muzzle": 0.85, "speed": 1.0, "melee": false,
+		"spread": 0.008, "auto": true, "zoom_fov": 50.0, "range": 300.0,
+		"falloff": [55.0, 140.0, 12], "kick": 0.006, "muzzle": 0.85, "speed": 1.0, "melee": false,
 	},
 	"sniper": {
 		"name": "Sniper", "desc": "One-shot kill at long range, scope",

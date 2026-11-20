@@ -355,9 +355,13 @@ func _draw_cross() -> void:
 		cross.draw_line(c - Vector2(0, r), c + Vector2(0, r), Color.BLACK, 1.5)
 	else:
 		var g: float = 5.0 + Weapons.DATA[p.weapon].spread * 220.0
+		var col := Color(1, 0.25, 0.2) if p.aim_blocked else Color.WHITE
 		for d: Vector2 in [Vector2.LEFT, Vector2.RIGHT, Vector2.UP, Vector2.DOWN]:
 			cross.draw_line(c + d * g, c + d * (g + 9.0), Color.BLACK, 4.0)
-			cross.draw_line(c + d * g, c + d * (g + 9.0), Color.WHITE, 2.0)
+			cross.draw_line(c + d * g, c + d * (g + 9.0), col, 2.0)
+		if p.aim_blocked:   # a wall is in the way: shots would hit it
+			for d: Vector2 in [Vector2(1, 1), Vector2(1, -1)]:
+				cross.draw_line(c - d * 6.0, c + d * 6.0, col, 2.5)
 	if _hit_t > 0.0:
 		var col := Color(1, 0.25, 0.2) if _hit_kill else Color.WHITE
 		for d: Vector2 in [Vector2(1, 1), Vector2(1, -1), Vector2(-1, 1), Vector2(-1, -1)]:
