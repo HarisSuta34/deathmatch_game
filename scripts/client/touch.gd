@@ -17,6 +17,7 @@ const BUTTONS := [
 var player: CharacterBody3D
 var _owner := {}          # touch index -> "stick" | "look" | button id
 var _held := {}
+var _last := {}           # touch index -> last position (own per-finger tracking)
 var _stick_center := Vector2.ZERO
 var _stick_vec := Vector2.ZERO
 
@@ -38,16 +39,25 @@ func _input(event: InputEvent) -> void:
 		return
 	if event is InputEventScreenTouch:
 		if event.pressed:
+			_last[event.index] = event.position
 			_touch_down(event.index, event.position)
 		else:
+			_last.erase(event.index)
 			_touch_up(event.index)
 	elif event is InputEventScreenDrag:
-		var o: String = _owner.get(event.index, "")
+		# Movement is measured per finger here. Godot 4.3's own event.relative mixes up
+		# fingers in the browser when two touch at once (the view flew to the sky).
+		var i: int = event.index
+		var rel: Vector2 = event.position - _last.get(i, event.position)
+		_last[i] = event.position
+		if rel.length() > 160.0:   # a jump this big in one event is never a real swipe
+			rel = Vector2.ZERO
+		var o: String = _owner.get(i, "")
 		if o == "stick":
 			_stick_vec = ((event.position - _stick_center) / STICK_R).limit_length(1.0)
 			player.touch_move = _stick_vec
-		elif o == "look" or o == "fire":   # the finger on FIRE can also drag to aim
-			player.look(event.relative, player.TOUCH_SENS)
+		elif o == "look" or o == "fire":   # the finger holding FIRE can drag to aim
+			player.look(rel, player.TOUCH_SENS)
 
 
 func _touch_down(i: int, pos: Vector2) -> void:
@@ -77,9 +87,8 @@ func _touch_up(i: int) -> void:
 func _press(id: String, down: bool) -> void:
 	_held[id] = down
 	match id:
-		"fire":   # tap to start shooting, tap again to stop
-			if down:
-				player.touch_shoot = not player.touch_shoot
+		"fire":   # like a controller trigger: shoots while held
+			player.touch_shoot = down
 		"aim":
 			if down:
 				player.aim_toggle = not player.aim_toggle
@@ -109,11 +118,10 @@ func _draw() -> void:
 		_text(font, base + Vector2(0, STICK_R + 28), "MOVE", 18)
 	for b: Array in BUTTONS:
 		var c := _center(b)
-		var firing: bool = b[0] == "fire" and player.touch_shoot
-		var on: bool = _held.get(b[0], false) or firing or (b[0] == "aim" and player.aim_toggle) or (b[0] == "crouch" and player.crouching)
+		var on: bool = _held.get(b[0], false) or (b[0] == "aim" and player.aim_toggle) or (b[0] == "crouch" and player.crouching)
 		draw_circle(c, b[3], Color(1, 0.45, 0.3, 0.6) if on else Color(0, 0, 0, 0.38))
 		draw_arc(c, b[3], 0, TAU, 40, Color(1, 1, 1, 0.65), 3.0)
-		_text(font, c, "STOP" if firing else b[1], 24 if b[3] > 60.0 else 18)
+		_text(font, c, b[1], 24 if b[3] > 60.0 else 18)
 
 
 func _text(font: Font, c: Vector2, text: String, fs: int) -> void:

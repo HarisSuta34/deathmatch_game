@@ -203,8 +203,7 @@ const DESKTOP_CONTROLS := [
 const TOUCH_CONTROLS := [
 	["Left thumb", "Joystick: move (push fully forward to sprint)"],
 	["Drag on the right", "Look around"],
-	["FIRE", "Tap to start shooting, tap again (STOP) to stop"],
-	["Drag FIRE", "Aim while shooting"],
+	["FIRE", "Shoot while held; slide the finger to aim as you shoot"],
 	["Top-right button", "Full screen on / off"],
 	["AIM", "Aim / scope on or off"],
 	["R", "Reload"],

@@ -45,7 +45,8 @@ var crouching := false
 var airborne := false
 var touch_mode := Config.touch_device()
 var touch_move := Vector2.ZERO   # on-screen joystick
-var touch_shoot := false         # on-screen FIRE toggle
+var touch_shoot := false         # on-screen FIRE held
+var _was_touch := false
 var aim_toggle := false          # on-screen AIM button or Q
 var avatar: Node3D
 var cam: Camera3D
@@ -233,14 +234,15 @@ func _update_weapon(delta: float) -> void:
 	var just := want_shoot and not _was_shoot
 	_was_shoot = want_shoot
 	if can_play:
-		# Touch FIRE is a toggle: while on, every weapon keeps firing at its own rate.
+		# Touch FIRE works like a trigger: while held, every weapon fires at its own rate.
+		var touch_just := touch_shoot and not _was_touch
+		_was_touch = touch_shoot
 		var want: bool = (want_shoot if w.auto else just) or touch_shoot
 		if want and cooldown <= 0.0 and reload_left <= 0.0:
 			if ammo > 0 or w.mag == 0:
 				_fire()
-			elif just or touch_shoot:
+			elif just or touch_just:
 				Sfx.play("empty")   # no automatic reload: press R
-				touch_shoot = false
 		if Input.is_action_just_pressed("reload"):
 			start_reload()
 	var k := 1.0 - exp(-14.0 * delta)
