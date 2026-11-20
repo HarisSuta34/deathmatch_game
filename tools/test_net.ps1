@@ -11,7 +11,7 @@ if (-not $External -and $Url -eq "") { $server = Start-Process $godot -ArgumentL
 Start-Sleep -Seconds 2
 $bots = @()
 $bots += Start-Process $godot -ArgumentList ($common + @('--bot=create', "--port=$port", "--url=$Url")) -NoNewWindow -PassThru -RedirectStandardOutput "$tmp\bot0.txt" -RedirectStandardError "$tmp\bot0_err.txt"
-Start-Sleep -Seconds (3 + 7 * [int]( -ne ""))
+Start-Sleep -Seconds $(if ($Url) { 10 } else { 3 })
 foreach ($i in 1..3) {
     $bots += Start-Process $godot -ArgumentList ($common + @('--bot=join', "--port=$port", "--url=$Url")) -NoNewWindow -PassThru -RedirectStandardOutput "$tmp\bot$i.txt" -RedirectStandardError "$tmp\bot${i}_err.txt"
 }

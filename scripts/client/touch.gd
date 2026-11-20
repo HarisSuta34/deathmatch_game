@@ -46,7 +46,7 @@ func _input(event: InputEvent) -> void:
 		if o == "stick":
 			_stick_vec = ((event.position - _stick_center) / STICK_R).limit_length(1.0)
 			player.touch_move = _stick_vec
-		elif o == "look":
+		elif o == "look" or o == "fire":   # the finger on FIRE can also drag to aim
 			player.look(event.relative, player.TOUCH_SENS)
 
 
@@ -77,8 +77,9 @@ func _touch_up(i: int) -> void:
 func _press(id: String, down: bool) -> void:
 	_held[id] = down
 	match id:
-		"fire":
-			player.touch_shoot = down
+		"fire":   # tap to start shooting, tap again to stop
+			if down:
+				player.touch_shoot = not player.touch_shoot
 		"aim":
 			if down:
 				player.aim_toggle = not player.aim_toggle
@@ -108,10 +109,11 @@ func _draw() -> void:
 		_text(font, base + Vector2(0, STICK_R + 28), "MOVE", 18)
 	for b: Array in BUTTONS:
 		var c := _center(b)
-		var on: bool = _held.get(b[0], false) or (b[0] == "aim" and player.aim_toggle) or (b[0] == "crouch" and player.crouching)
+		var firing: bool = b[0] == "fire" and player.touch_shoot
+		var on: bool = _held.get(b[0], false) or firing or (b[0] == "aim" and player.aim_toggle) or (b[0] == "crouch" and player.crouching)
 		draw_circle(c, b[3], Color(1, 0.45, 0.3, 0.6) if on else Color(0, 0, 0, 0.38))
 		draw_arc(c, b[3], 0, TAU, 40, Color(1, 1, 1, 0.65), 3.0)
-		_text(font, c, b[1], 24 if b[3] > 60.0 else 18)
+		_text(font, c, "STOP" if firing else b[1], 24 if b[3] > 60.0 else 18)
 
 
 func _text(font: Font, c: Vector2, text: String, fs: int) -> void:

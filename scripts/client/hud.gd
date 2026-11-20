@@ -115,6 +115,8 @@ func _ready() -> void:
 	_place(leave_btn, Control.PRESET_TOP_LEFT, 16, 14, 130, 36)
 
 	if game.player.touch_mode:
+		feed.offset_top += 50   # room for the full-screen button
+		feed.offset_bottom += 50
 		touch = Touch.new()
 		touch.player = game.player
 		root.add_child(touch)

@@ -41,6 +41,7 @@ func _ready() -> void:
 		_perf_loop()
 	if Config.touch_device():
 		_setup_portrait_hint()
+		_setup_fullscreen_button()
 	menu = Menu.new()
 	add_child(menu)
 	_end_game()
@@ -147,6 +148,54 @@ func _setup_input() -> void:
 			var e := InputEventKey.new()
 			e.physical_keycode = key
 			InputMap.action_add_event(a, e)
+
+
+# Phones: a button in the top-right corner that enters / leaves full screen (hides the
+# browser's address bar). Browsers only allow this from a tap, so it is a button.
+# Hidden where the browser has no full-screen support (iPhone Safari).
+func _setup_fullscreen_button() -> void:
+	var web := OS.has_feature("web")
+	if web and not JavaScriptBridge.eval("(document.fullscreenEnabled || document.webkitFullscreenEnabled) ? true : false", true):
+		return
+	var layer := CanvasLayer.new()
+	layer.layer = 101
+	add_child(layer)
+	var b := Button.new()
+	b.focus_mode = Control.FOCUS_NONE
+	b.add_theme_font_size_override("font_size", 20)
+	b.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	b.offset_left = -196
+	b.offset_top = 12
+	b.offset_right = -14
+	b.offset_bottom = 56
+	layer.add_child(b)
+	var is_full := func() -> bool:
+		if web:
+			return JavaScriptBridge.eval("(document.fullscreenElement || document.webkitFullscreenElement) ? true : false", true)
+		return DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	b.pressed.connect(func() -> void:
+		var full: bool = is_full.call()
+		if web:
+			JavaScriptBridge.eval("""(function () {
+				var d = document, e = d.documentElement;
+				if (d.fullscreenElement || d.webkitFullscreenElement) {
+					(d.exitFullscreen || d.webkitExitFullscreen).call(d);
+				} else {
+					var p = (e.requestFullscreen || e.webkitRequestFullscreen).call(e);
+					if (p && p.catch) p.catch(function () {});
+				}
+			})()""")
+		else:
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN))
+	# Keep the label right even when the user leaves full screen with the back gesture.
+	var timer := Timer.new()
+	timer.wait_time = 0.4
+	timer.autostart = true
+	layer.add_child(timer)
+	var update := func() -> void:
+		b.text = "Exit full screen" if is_full.call() else "Full screen"
+	timer.timeout.connect(update)
+	update.call()
 
 
 # Phones held upright: ask to rotate (the game is laid out for landscape).
