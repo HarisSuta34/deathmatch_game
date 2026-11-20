@@ -8,6 +8,13 @@ const CODE_FILE := "user://bot_code.txt"
 
 var mode := ""
 var port := 9080
+var url := ""        # ++ --url=wss://... to test a deployed server
+var _t0 := 0
+var _last_snap := 0
+var _first_snap := 0
+var _snap_n := 0
+var _gap_max := 0
+var _late := 0
 var teams := {}
 var enemy_pos := {}
 var alive := false
@@ -28,7 +35,9 @@ func _ready() -> void:
 	Net.disconnected.connect(func() -> void:
 		print("BOT disconnected")
 		get_tree().quit(1))
-	Net.connect_to("ws://localhost:%d" % port)
+	_t0 = Time.get_ticks_msec()
+	Net.connect_to(url if url != "" else "ws://localhost:%d" % port)
+	Net.connected.connect(func() -> void: print("BOT connected after %d ms" % (Time.get_ticks_msec() - _t0)))
 
 
 func _on_msg(msg: String, a: Array) -> void:
@@ -55,6 +64,16 @@ func _on_msg(msg: String, a: Array) -> void:
 				alive = true
 				pos = Vector3(10 + (Net.my_id % 5), 0.1, -10 if teams[Net.my_id] == 0 else -22)
 		"snap":
+			# Snapshot timing: the server should send 20 per second, evenly.
+			var now := Time.get_ticks_msec()
+			if _first_snap == 0:
+				_first_snap = now
+			if _last_snap > 0:
+				_snap_n += 1
+				_gap_max = maxi(_gap_max, now - _last_snap)
+				if now - _last_snap > 150:
+					_late += 1
+			_last_snap = now
 			tick = a[0]
 			enemy_pos.clear()
 			var ids: PackedInt32Array = a[2]
@@ -71,6 +90,8 @@ func _on_msg(msg: String, a: Array) -> void:
 			print("BOT kill event: %d killed %d with %s, scores %s" % [a[0], a[1], a[2], a[3]])
 		"match_end":
 			print("BOT match end: scores %s winner %d" % [a[0], a[1]])
+			var secs := (Time.get_ticks_msec() - _first_snap) / 1000.0
+			print("BOT snapshots: %.1f per second, longest gap %d ms, gaps over 150 ms: %d" % [_snap_n / secs, _gap_max, _late])
 
 
 func _process(delta: float) -> void:

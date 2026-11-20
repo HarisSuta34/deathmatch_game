@@ -50,6 +50,7 @@ static func get_map(id: int) -> Dictionary:
 			else:
 				b.inv = (b.t as Transform3D).affine_inverse()
 				b.aabb = AABB(-b.s * 0.5, b.s)
+				b.waabb = (b.t as Transform3D) * (b.aabb as AABB)
 				solid.append(b)
 		_cache[id] = {"id": id, "boxes": solid, "decor": decor, "hx": size.x, "hz": size.y}
 	return _cache[id]
@@ -68,6 +69,9 @@ static func spawn_point(map: Dictionary, team: int, n: int) -> Array:
 static func ray_world(map: Dictionary, from: Vector3, to: Vector3) -> float:
 	var best := 1.0
 	for b: Dictionary in map.boxes:
+		# Cheap world-space bounds test first; most boxes are rejected here.
+		if not (b.waabb as AABB).intersects_segment(from, to):
+			continue
 		var inv: Transform3D = b.inv
 		var lf := inv * from
 		var lt := inv * to
@@ -132,7 +136,8 @@ static func build_scene(parent: Node, map: Dictionary) -> void:
 	sun.rotation_degrees = Vector3(-50, 35, 0)
 	sun.light_energy = 0.7
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 110.0
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS   # 2 shadow passes instead of 4
+	sun.directional_shadow_max_distance = 70.0
 	parent.add_child(sun)
 	parent.add_child(build(map))
 

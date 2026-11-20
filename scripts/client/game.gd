@@ -320,12 +320,8 @@ func _show_heal(pos: Vector3) -> void:
 	_box(_heal, Vector3(2.8, 0.05, 2.8), Vector3(0, 0.03, 0), _unlit(Color(0.2, 1.0, 0.35, 0.45)))
 	_box(_heal, Vector3(1.8, 0.07, 0.5), Vector3(0, 0.05, 0), white)
 	_box(_heal, Vector3(0.5, 0.07, 1.8), Vector3(0, 0.05, 0), white)
-	var light := OmniLight3D.new()
-	light.light_color = Color(0.3, 1.0, 0.4)
-	light.light_energy = 1.5
-	light.omni_range = 4.0
-	light.position.y = 1.0
-	_heal.add_child(light)
+	# Glow without a real light (a light would force a shader rebuild = multi-second freeze on the web).
+	_box(_heal, Vector3(2.4, 1.6, 2.4), Vector3(0, 0.8, 0), _unlit(Color(0.3, 1.0, 0.4, 0.12)))
 
 
 func _heal_taken(id: int, pos: Vector3, new_hp: int) -> void:

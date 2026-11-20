@@ -27,12 +27,18 @@ func _ready() -> void:
 		var bot: Node = load("res://scripts/dev/bot.gd").new()
 		bot.mode = opt.bot
 		bot.port = int(opt.get("port", Config.DEFAULT_PORT))
+		bot.url = opt.get("url", "")
 		add_child(bot)
 		return
 	_setup_input()
 	Net.message.connect(_on_msg)
 	Net.disconnected.connect(_end_game)
+	var t0 := Time.get_ticks_msec()
 	Sfx.init()
+	if opt.has("perf"):
+		print("PERF sound generation: %d ms" % (Time.get_ticks_msec() - t0))
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)   # show real headroom
+		_perf_loop()
 	if Config.touch_device():
 		_setup_portrait_hint()
 	menu = Menu.new()
@@ -95,6 +101,19 @@ func _end_game() -> void:
 		add_child(backdrop)
 	Sfx.music(true)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+
+# Dev helper: `++ --perf` prints frame rate and costs every 2 seconds.
+func _perf_loop() -> void:
+	while true:
+		await get_tree().create_timer(2.0).timeout
+		print("PERF fps %d | frame cpu %.1f ms | physics %.1f ms | draw calls %d | objects %d | nodes %d" % [
+			Performance.get_monitor(Performance.TIME_FPS),
+			Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0,
+			Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0,
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
+			Performance.get_monitor(Performance.OBJECT_NODE_COUNT)])
 
 
 # Dev helper: `++ --shot=file.png [--shot-delay=2] [--pose=x,z,yaw,pitch] [--hud=death]`

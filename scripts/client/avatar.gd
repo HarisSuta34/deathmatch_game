@@ -45,6 +45,7 @@ var _flash := 0.0
 var _sway := Vector2.ZERO
 var _last_yaw := 0.0
 var _shielded := false
+var _hit_crouch := false
 
 
 func setup(team: int, nick: String, remote: bool, friendly := false) -> void:
@@ -202,8 +203,9 @@ func animate(delta: float, vel: Vector3, sprint: bool, pitch: float, reloading :
 	hips.position.y = 0.75 - CROUCH_DROP * _crouch
 	upper.position.y = -CROUCH_DROP * _crouch + bob * (1.0 - _air)
 	upper.rotation.x = 0.15 * _crouch
-	if _hit_col:
-		var h := lerpf(1.8, 1.25, _crouch)
+	if _hit_col and _hit_crouch != crouch:   # only touch the physics shape when it changes
+		_hit_crouch = crouch
+		var h := 1.25 if crouch else 1.8
 		(_hit_col.shape as BoxShape3D).size.y = h
 		_hit_col.position.y = h * 0.5
 	# Weapon sway from turning, idle breathing and walking.
