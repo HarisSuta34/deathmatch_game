@@ -50,6 +50,7 @@ var _msg_t := 0.0
 var _hit_t := 0.0
 var _hit_kill := false
 var _results_t := 0.0
+var _banner: PanelContainer
 
 
 func _ready() -> void:
@@ -279,6 +280,56 @@ func heal_effect() -> void:
 	var tw := create_tween().set_parallel()
 	tw.tween_property(popup, "position:y", popup.position.y - 70.0, 1.4)
 	tw.tween_property(popup, "modulate:a", 0.0, 1.4).set_delay(0.4)
+
+
+# Knife kill: banner in the upper middle of the screen with the Bulgarian flag.
+func knife_banner(killer: int) -> void:
+	if _banner:
+		_banner.queue_free()
+	_banner = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.05, 0.06, 0.1, 0.85)
+	sb.set_corner_radius_all(8)
+	sb.set_content_margin_all(14)
+	sb.border_width_bottom = 4
+	sb.border_color = Color(0.0, 0.59, 0.43)
+	_banner.add_theme_stylebox_override("panel", sb)
+	_banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var v := VBoxContainer.new()
+	v.alignment = BoxContainer.ALIGNMENT_CENTER
+	_banner.add_child(v)
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 18)
+	v.add_child(row)
+	row.add_child(_label("Bulgarian strikes once again", 40, Color.WHITE))
+	var flag := VBoxContainer.new()   # white, green, red stripes
+	flag.add_theme_constant_override("separation", 0)
+	flag.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	for c: Color in [Color(1, 1, 1), Color(0.0, 0.59, 0.43), Color(0.84, 0.15, 0.07)]:
+		var stripe := ColorRect.new()
+		stripe.color = c
+		stripe.custom_minimum_size = Vector2(72, 16)
+		flag.add_child(stripe)
+	row.add_child(flag)
+	var sub := _label("ЗА БЪЛГАРИЯ!   %s  -  Bulgarian Special Knife" % game.nick(killer), 22, Color(1, 0.85, 0.4))
+	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(sub)
+	var holder := CenterContainer.new()
+	holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(_banner)
+	_place(holder, Control.PRESET_CENTER_TOP, -500, 120, 1000, 130)
+	_banner.tree_exited.connect(holder.queue_free)
+	# Pop in, hold for the jingle (about 4 s), fade out.
+	_banner.modulate.a = 0.0
+	_banner.scale = Vector2(0.6, 0.6)
+	_banner.resized.connect(func() -> void: _banner.pivot_offset = _banner.size * 0.5, CONNECT_ONE_SHOT)
+	var tw := create_tween()
+	tw.tween_property(_banner, "modulate:a", 1.0, 0.15)
+	tw.parallel().tween_property(_banner, "scale", Vector2.ONE, 0.35).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tw.tween_interval(3.4)
+	tw.tween_property(_banner, "modulate:a", 0.0, 0.5)
+	tw.tween_callback(_banner.queue_free)
 
 
 func hit_marker(kill: bool) -> void:

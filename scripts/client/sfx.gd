@@ -9,6 +9,9 @@ var _streams := {}
 var _pool: Array[AudioStreamPlayer] = []
 var _next := 0
 var _music: AudioStreamPlayer
+var _bulgaria: AudioStreamPlayer
+
+const KNIFE_CLIP := "res://audio/knife_kill.ogg"
 
 
 func init() -> void:
@@ -42,6 +45,14 @@ func init() -> void:
 	_mix(rel, _blast(0.06, 60.0, 0.6, 500.0, 0.4, 0.7), int(0.32 * RATE))
 	_mix(rel, _blast(0.05, 80.0, 0.9, 1300.0, 0.3, 0.6), int(0.6 * RATE))
 	_streams["reload"] = _wav(rel, RATE)
+	# Knife-kill jingle: your own clip at res://audio/knife_kill.ogg if present, else the built-in one.
+	_bulgaria = AudioStreamPlayer.new()
+	_bulgaria.volume_db = -2.0
+	if ResourceLoader.exists(KNIFE_CLIP):
+		_bulgaria.stream = load(KNIFE_CLIP)
+	else:
+		_bulgaria.stream = _make_ruchenitsa()
+	add_child(_bulgaria)
 	_music = AudioStreamPlayer.new()
 	_music.stream = _make_music()
 	_music.volume_db = -13.0
@@ -73,6 +84,13 @@ func play_at(sound: String, pos: Vector3, parent: Node, db := 0.0) -> void:
 	parent.add_child(p)
 	p.finished.connect(p.queue_free)
 	p.play()
+
+
+# Plays the knife-kill jingle from the start (restarts if a second knife kill happens).
+func bulgaria() -> void:
+	if _bulgaria:
+		_bulgaria.stop()
+		_bulgaria.play()
 
 
 func music(on: bool) -> void:
@@ -191,3 +209,64 @@ func _drum(buf: PackedFloat32Array, at: int, dur: float, vol: float, decay: floa
 			ph += TAU * hz * exp(-t * 20.0) / MUSIC_RATE
 			v = sin(ph)
 		buf[at + i] += v * vol * exp(-t * decay)
+
+
+# About 4 s of an original tune in the style of a Bulgarian ruchenitsa: 7/8 time (2+2+3),
+# a gaida-like (Bulgarian bagpipe) melody with grace notes over a drone, and a tapan drum.
+# The scale is D harmonic minor, whose augmented second (B flat to C sharp) gives the
+# typical Balkan sound.
+func _make_ruchenitsa() -> AudioStreamWAV:
+	var eighth := 0.11
+	var bars := [
+		[[69, 2], [70, 1], [69, 1], [67, 1], [69, 2]],
+		[[74, 2], [73, 1], [70, 1], [69, 1], [67, 2]],
+		[[69, 1], [70, 1], [69, 1], [67, 1], [65, 1], [64, 2]],
+		[[65, 2], [67, 1], [65, 1], [64, 1], [62, 2]],
+		[[62, 2], [69, 2], [74, 3]],
+	]
+	var total := int((35 * eighth + 0.45) * RATE)
+	var buf := PackedFloat32Array()
+	buf.resize(total)
+	# One cycle of a nasal, reedy waveform (strong odd and even harmonics), read as a table.
+	var table := PackedFloat32Array()
+	table.resize(256)
+	for i in 256:
+		var p := TAU * i / 256.0
+		table[i] = (sin(p) + 0.7 * sin(2 * p) + 0.6 * sin(3 * p) + 0.4 * sin(4 * p) + 0.35 * sin(5 * p) + 0.2 * sin(7 * p)) / 3.0
+	# Drone on low D for the whole clip.
+	_reed(buf, table, 0, total, 50, 0.16, 0.0)
+	var at := 0
+	var step := 0
+	for bar: Array in bars:
+		for n: Array in bar:
+			var dur := int(n[1] * eighth * RATE)
+			var grace := 0
+			if n[1] >= 2:   # quick ornament a step above, typical of gaida playing
+				grace = int(0.03 * RATE)
+				_reed(buf, table, at, grace, n[0] + 2, 0.32, 0.0)
+			_reed(buf, table, at + grace, dur - grace, n[0], 0.32, 5.5)
+			at += dur
+		# Tapan: deep boom on the start of each group (2+2+3), stick clicks on every eighth.
+		for e in 7:
+			var s := (step + e) * eighth
+			var pos := int(s * RATE)
+			if e == 0 or e == 2 or e == 4:
+				_mix(buf, _blast(0.25, 14.0, 0.05, 70.0, 0.85 if e == 0 else 0.55, 0.15), pos)
+			else:
+				_mix(buf, _blast(0.04, 90.0, 0.7, 900.0, 0.0, 0.18), pos)
+		step += 7
+	_mix(buf, _blast(0.45, 7.0, 0.05, 60.0, 1.0, 0.2), at)   # final boom
+	for i in total:
+		buf[i] = clampf(buf[i] * 0.9, -1.0, 1.0)
+	return _wav(buf, RATE)
+
+
+func _reed(buf: PackedFloat32Array, table: PackedFloat32Array, at: int, n: int, midi: int, vol: float, vibrato: float) -> void:
+	var freq := 440.0 * pow(2.0, (midi - 69) / 12.0)
+	var ph := 0.0
+	n = mini(n, buf.size() - at)
+	for i in n:
+		var f := freq * (1.0 + sin(i * TAU * vibrato / RATE) * 0.006)
+		ph = fmod(ph + f * 256.0 / RATE, 256.0)
+		var env := minf(1.0, i / 120.0) * minf(1.0, (n - i) / 200.0)
+		buf[at + i] += table[int(ph)] * vol * env

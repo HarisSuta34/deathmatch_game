@@ -44,6 +44,9 @@ The owner is new to game development: make sensible decisions, explain briefly, 
 - Touch devices (`Config.touch_device()` = coarse pointer; `++ --touch` forces it): `touch.gd` joystick/look/buttons; mouse clicks emulated from touches are ignored for shooting (player.gd reads real mouse buttons, device != -1); nickname/room code use `window.prompt`; portrait shows a "rotate your phone" screen.
 - Desktop AIM toggle button + Q key (for touchpads); right click still works.
 - Main menu "Controls" page.
+- Knife kill: every client shows "Bulgarian strikes once again" + Bulgarian flag (HUD `knife_banner`) and plays a ~4 s jingle (`Sfx.bulgaria()`): an original synthesized ruchenitsa (7/8, gaida + drone + tapan). No real song recording is used (copyright + no-external-assets rule); a licensed clip placed at `audio/knife_kill.ogg` replaces it automatically.
+- Mobile FIRE = hold to shoot, slide the same finger to aim. Touch look uses own per-finger tracking (Godot 4.3 web mixes up `relative` between fingers).
+- Shots start at the right shoulder (`player.aim_solution()`), crosshair turns red with an X when a wall blocks the shot.
 - Knife model generated in `Weapons._knife_parts()` (curved edge, point, guard, handle); name "Bulgarian Special Knife".
 
 ### Multiplayer and hosting

@@ -127,6 +127,10 @@ func _screenshot(path: String, delay: float, opt: Dictionary) -> void:
 		game.player.yaw = v[2]
 		game.player.pitch = v[3] if v.size() > 3 else 0.0
 		await get_tree().create_timer(0.5).timeout
+	if game and opt.get("hud", "") == "knife":
+		game.hud.knife_banner(-1)
+		Sfx.bulgaria()
+		await get_tree().create_timer(0.8).timeout
 	if game and opt.get("hud", "") == "death":
 		game.hud.show_death(-1, 7.5)
 		await get_tree().create_timer(0.6).timeout

@@ -127,6 +127,9 @@ func _on_msg(msg: String, a: Array) -> void:
 				info[v].deaths += 1
 				info[v].alive = false
 			hud.add_kill(k, v, a[2])
+			if a[2] == "knife":   # everyone in the match sees and hears it
+				hud.knife_banner(k)
+				Sfx.bulgaria()
 			if v == my_id:
 				player.die()
 				shield_left = 0.0
