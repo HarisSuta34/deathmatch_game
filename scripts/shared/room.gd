@@ -9,13 +9,17 @@ const Maps = preload("res://scripts/shared/maps.gd")
 const TICK := 0.05            # snapshot interval (20 Hz)
 const MAX_HP := 100
 const MAX_PLAYERS := 20
-const RESPAWN_DELAY := 6.0       # the loadout screen is shown during this time
-const SPAWN_PROTECT := 10.0      # invincible after spawning; ends early when you attack
-const WARMUP := 6.0           # loadout time before the first spawn
+const RESPAWN_DELAY := 10.0      # death screen (scores + loadout) is shown during this time
+const SPAWN_PROTECT := 10.0      # invincible after a respawn (not at match start), even while shooting
+const WARMUP := 8.0              # match intro screen before the first spawn
 const RESULTS_TIME := 10.0
 const EYE := Vector3(0, 1.5, 0)
 const BOX_HALF := Vector3(0.4, 0, 0.4)
-const BOX_SIZE := Vector3(0.8, 1.8, 0.8)
+const STAND_H := 1.8
+const CROUCH_H := 1.25
+const FLAG_CROUCH := 32
+const HEAL_RADIUS := 1.4
+const HEAL_DELAY := [15.0, 25.0]   # seconds until the heal zone reappears after a pickup
 const START_ERROR := "Need an even number of players (4-20) to start"
 
 var code := ""
@@ -31,6 +35,7 @@ var dev := false              # dev server: skip the 4-20 even rule
 var dev_seconds := 0.0        # dev server: override match length
 var practice := false         # offline room with bots
 var send: Callable
+var heal_pos: Variant = null  # Vector3 while a heal zone is on the map
 
 var _now := 0.0
 var _acc := 0.0
@@ -40,6 +45,8 @@ var _spawn_n := 0
 var _history := []            # [{t: tick, p: {id: position}}] for lag compensation
 var _map: Dictionary
 var _rng := RandomNumberGenerator.new()
+var _heal_at := 0.0
+var _last_heal := Vector3(0, -100, 0)
 
 
 func add_player(id: int, nick: String, bot := false, team := -1) -> void:
@@ -49,6 +56,7 @@ func add_player(id: int, nick: String, bot := false, team := -1) -> void:
 		"hp": MAX_HP, "alive": false, "pos": Vector3.ZERO, "yaw": 0.0, "pitch": 0.0, "flags": 0,
 		"kills": 0, "deaths": 0, "respawn_at": 0.0, "protect_until": 0.0,
 		"ammo": 0, "shot_time": 0.0, "reload_until": 0.0, "think_at": 0.0,
+		"protect_next": false, "heal_msg_at": 0.0,
 	}
 	if host_id == 0 and not bot:
 		host_id = id
@@ -137,6 +145,8 @@ func tick(delta: float) -> void:
 			_kill(p, {})
 		elif p.bot:
 			_bot_think(p)
+	if _now >= _warm_until:
+		_update_heal()
 	_acc += delta
 	if _acc >= TICK:
 		_acc = minf(_acc - TICK, TICK)
@@ -177,12 +187,15 @@ func _try_start() -> void:
 	_history.clear()
 	_spawn_n = _rng.randi() % 10
 	_warm_until = _now + WARMUP
+	heal_pos = null
+	_heal_at = _warm_until + _rng.randf_range(6.0, 10.0)
 	var info := []
 	for id: int in players:
 		var p: Dictionary = players[id]
 		p.kills = 0
 		p.deaths = 0
 		p.alive = false
+		p.protect_next = false   # no spawn protection at match start
 		p.respawn_at = _warm_until
 		info.append([id, p.nick, p.team])
 	_all("match_start", [map_id, time_left, info, WARMUP])
@@ -190,6 +203,7 @@ func _try_start() -> void:
 
 func _end_match() -> void:
 	state = "results"
+	heal_pos = null
 	_state_until = _now + RESULTS_TIME
 	var stats := []
 	for id: int in players:
@@ -208,7 +222,8 @@ func _spawn(p: Dictionary) -> void:
 	p.alive = true
 	p.ammo = Weapons.DATA[p.weapon].mag
 	p.reload_until = 0.0
-	p.protect_until = _now + (2.0 if p.bot else SPAWN_PROTECT)
+	var prot := SPAWN_PROTECT if p.protect_next else 0.0
+	p.protect_until = _now + prot
 	if p.bot:
 		# Practice bots stand at a random spot on the enemy half of the map.
 		var x := _rng.randf_range(-0.6, 0.6) * float(_map.hx)
@@ -222,7 +237,7 @@ func _spawn(p: Dictionary) -> void:
 		p.pos = sp[0]
 		p.yaw = sp[1]
 	p.pitch = 0.0
-	_all("spawn", [p.id, p.pos, p.yaw, p.weapon])
+	_all("spawn", [p.id, p.pos, p.yaw, p.weapon, prot])
 
 
 func _snapshot() -> void:
@@ -262,7 +277,6 @@ func _shoot(p: Dictionary, origin: Vector3, dir: Vector3, seed_val: int, rtick: 
 	p.shot_time = maxf(p.shot_time, _now - 0.2) + w.interval
 	if w.mag > 0:
 		p.ammo -= 1
-	p.protect_until = 0.0
 	_fire(p, origin, dir.normalized(), seed_val, rtick)
 
 
@@ -280,7 +294,9 @@ func _fire(p: Dictionary, origin: Vector3, dir: Vector3, seed_val: int, rtick: f
 			var q: Dictionary = players[id]
 			if q.team == p.team or not q.alive:
 				continue
-			var hit: Variant = AABB(_pos_at(q, rt) - BOX_HALF, BOX_SIZE).grow(grow).intersects_segment(origin, to)
+			var h := CROUCH_H if (q.flags & FLAG_CROUCH) != 0 else STAND_H
+			var box := AABB(_pos_at(q, rt) - BOX_HALF, Vector3(0.8, h, 0.8)).grow(grow)
+			var hit: Variant = box.intersects_segment(origin, to)
 			if hit != null:
 				var f: float = origin.distance_to(hit) / reach
 				if f < best:
@@ -322,6 +338,7 @@ func _kill(v: Dictionary, attacker: Dictionary) -> void:
 	v.hp = 0
 	v.deaths += 1
 	v.respawn_at = _now + RESPAWN_DELAY
+	v.protect_next = true
 	var kid := 0
 	var weapon := ""
 	if not attacker.is_empty():
@@ -349,6 +366,57 @@ func _bot_think(b: Dictionary) -> void:
 		b.yaw = atan2(-dir.x, -dir.z)
 		b.pitch = asin(dir.y)
 		dir += Vector3(_rng.randf_range(-0.05, 0.05), _rng.randf_range(-0.05, 0.05), _rng.randf_range(-0.05, 0.05))
-		b.protect_until = 0.0
 		_fire(b, from, dir.normalized(), _rng.randi() & 0xFFFFFF, float(tick_n))
 		return
+
+
+# ---------- heal zone ----------
+
+func _update_heal() -> void:
+	if heal_pos == null:
+		if _now >= _heal_at:
+			heal_pos = _heal_spot()
+			if heal_pos == null:
+				_heal_at = _now + 2.0
+			else:
+				_all("heal", [heal_pos])
+		return
+	var hp_pos: Vector3 = heal_pos
+	for id: int in players:
+		var p: Dictionary = players[id]
+		if not p.alive:
+			continue
+		var d: Vector3 = p.pos - hp_pos
+		if Vector2(d.x, d.z).length() > HEAL_RADIUS or absf(d.y) > 1.5:
+			continue
+		if p.hp >= MAX_HP:
+			if not p.bot and _now >= p.heal_msg_at:
+				p.heal_msg_at = _now + 2.0
+				send.call(id, "heal_full", [])
+			continue
+		p.hp = MAX_HP
+		_all("heal_taken", [id, hp_pos, p.hp])
+		_last_heal = hp_pos
+		heal_pos = null
+		_heal_at = _now + _rng.randf_range(HEAL_DELAY[0], HEAL_DELAY[1])
+		return
+
+
+# A random open-ground spot between the bases (never in a base, on a roof or under a platform).
+func _heal_spot() -> Variant:
+	var hx: float = _map.hx
+	var hz: float = _map.hz
+	for i in 60:
+		var c := Vector3(_rng.randf_range(-hx + 4.0, hx - 4.0), 0, _rng.randf_range(-(hz - 20.0), hz - 20.0))
+		if c.distance_to(_last_heal) < 15.0:
+			continue
+		var ok := true
+		for o: Vector3 in [Vector3.ZERO, Vector3(1.3, 0, 0), Vector3(-1.3, 0, 0), Vector3(0, 0, 1.3), Vector3(0, 0, -1.3)]:
+			var x := c.x + o.x
+			var z := c.z + o.z
+			if absf(30.0 - 31.0 * Maps.ray_world(_map, Vector3(x, 30, z), Vector3(x, -1, z))) > 0.05:
+				ok = false
+				break
+		if ok:
+			return c
+	return null
